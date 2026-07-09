@@ -206,6 +206,7 @@
       <button id="navDispose">Dispose</button>
       <button id="navLookup">Lookup</button>
       <button id="navInitiatives">Initiatives</button>
+      <button id="navPropositions">Propositions</button>
       <button id="navTasks">Tasks</button>
     </div>
 
@@ -381,6 +382,29 @@
       <div id="tasksList" style="margin-top:12px"></div>
     </div>
     </div><!-- /tasksView -->
+
+    <div id="propositionsView" class="hidden">
+    <div class="panel">
+      <h2>Propositions <button class="ghost mini" id="propRefresh" style="margin-left:10px">refresh</button></h2>
+      <p class="hint">Durable workspaces — one per Compass product, plus multi-stakeholder projects. Fold theses in to enrich them; tasks sit by horizon; stakeholders advance across the board. Advancing a stakeholder's stage writes a chain-registered signal (the relationship trajectory).</p>
+      <details style="margin-top:10px">
+        <summary class="hint" style="cursor:pointer">+ new proposition</summary>
+        <div style="margin-top:8px">
+          <label>Title *</label><input id="p_title" placeholder="Reinventing Finance with AI">
+          <label>Kind</label>
+          <select id="p_kind"><option value="product">product (one per Compass product)</option><option value="project">project (multi-stakeholder)</option></select>
+          <label>Product</label><input id="p_product" placeholder="Currents">
+          <label>Thesis statement</label><textarea id="p_thesis" rows="2" placeholder="The positioning / intent for this workspace…"></textarea>
+          <button id="p_createBtn" style="margin-top:8px">Create proposition</button>
+          <div class="out" id="p_createOut" style="margin-top:8px"></div>
+        </div>
+      </details>
+      <div id="propList" style="margin-top:14px"></div>
+    </div>
+    <div class="panel" id="propDetailPanel" style="display:none">
+      <div id="propDetail"></div>
+    </div>
+    </div><!-- /propositionsView -->
   </div>
 </div>
 
@@ -663,11 +687,12 @@
   let SUGS = [], SELID = null
 
   function setNav(active) {
-    for (const id of ["navAdd", "navDispose", "navLookup", "navInitiatives", "navTasks"]) $(id).classList.toggle("active", id === active)
+    for (const id of ["navAdd", "navDispose", "navLookup", "navInitiatives", "navPropositions", "navTasks"]) $(id).classList.toggle("active", id === active)
     $("addView").classList.toggle("hidden", active !== "navAdd")
     $("disposeView").classList.toggle("hidden", active !== "navDispose")
     $("lookupView").classList.toggle("hidden", active !== "navLookup")
     $("initiativesView").classList.toggle("hidden", active !== "navInitiatives")
+    $("propositionsView").classList.toggle("hidden", active !== "navPropositions")
     $("tasksView").classList.toggle("hidden", active !== "navTasks")
     document.body.classList.toggle("wide", active === "navDispose")
   }
@@ -675,6 +700,7 @@
   function showDispose() { setNav("navDispose"); loadSuggestions() }
   function showLookup() { setNav("navLookup"); $("rm_q").focus() }
   function showInitiatives() { setNav("navInitiatives"); $("i_intent").focus() }
+  function showPropositions() { setNav("navPropositions"); loadPropositions() }
   function showTasks() { setNav("navTasks"); loadTasks() }
 
   // ---- reverse-match (Day 90): resolve a pasted name/email/linkedin/org against the spine ----
@@ -1377,6 +1403,228 @@
     card.appendChild(slot)
   }
 
+  // ---- Propositions (Day 119): durable per-product / per-project workspaces ----
+  const STAGES = ["considering", "latent", "active", "committed", "declined", "dropped"]
+  const STAGE_LABEL = { considering: "Considering", latent: "Latent", active: "Active", committed: "Committed", declined: "Declined", dropped: "Dropped" }
+  const STAGE_COLOR = { considering: "var(--ink-faint)", latent: "var(--ink-dim)", active: "var(--gold)", committed: "var(--green)", declined: "var(--reject)", dropped: "var(--reject)" }
+  const HORIZONS = ["now", "next", "later"]
+  let PROP_OPEN = null
+
+  async function loadPropositions() {
+    const host = $("propList"); host.textContent = "loading…"
+    try { const r = await api("list_propositions", {}); renderPropList(r.propositions || []) }
+    catch (e) { host.textContent = e.message }
+  }
+
+  function renderPropList(props) {
+    const host = $("propList"); host.innerHTML = ""
+    if (!props.length) { host.innerHTML = '<p class="hint">No propositions yet. Create one above, then fold theses in from Dispose.</p>'; return }
+    for (const p of props) {
+      const card = document.createElement("div"); card.className = "pending-card"; card.style.cursor = "pointer"
+      const head = document.createElement("div"); head.className = "who"; head.textContent = p.title
+      card.appendChild(head)
+      const meta = document.createElement("div"); meta.className = "hint"; meta.style.marginTop = "5px"
+      meta.innerHTML = '<span style="color:var(--gold)">' + esc(p.product || p.kind) + "</span> · " + esc(p.status)
+        + " · " + p.stakeholders + " stakeholder" + (p.stakeholders === 1 ? "" : "s")
+        + " · " + p.orgs + " org" + (p.orgs === 1 ? "" : "s")
+        + " · " + p.tasks_open + " open task" + (p.tasks_open === 1 ? "" : "s")
+        + " · " + p.theses + " thes" + (p.theses === 1 ? "is" : "es")
+      card.appendChild(meta)
+      card.addEventListener("click", () => openProposition(p.id))
+      host.appendChild(card)
+    }
+  }
+
+  async function openProposition(id) {
+    PROP_OPEN = id
+    const panel = $("propDetailPanel"), host = $("propDetail")
+    panel.style.display = "block"; host.textContent = "loading…"
+    try { const r = await api("get_proposition", { proposition_id: id }); renderPropDetail(r.proposition) }
+    catch (e) { host.textContent = e.message }
+    panel.scrollIntoView({ behavior: "smooth", block: "start" })
+  }
+
+  function propSection(t) {
+    const d = document.createElement("div"); d.className = "hint"
+    d.style.cssText = "text-transform:uppercase;letter-spacing:.12em;color:var(--ink-faint);margin:18px 0 8px;border-bottom:1px solid var(--line);padding-bottom:4px"
+    d.textContent = t; return d
+  }
+  function propColumn(headText, headColor) {
+    const col = document.createElement("div")
+    col.style.cssText = "flex:1;min-width:150px;background:rgba(255,255,255,.02);border:1px solid var(--line);border-radius:6px;padding:8px"
+    const h = document.createElement("div"); h.className = "hint"
+    h.style.cssText = "text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px" + (headColor ? ";color:" + headColor : "")
+    h.textContent = headText; col.appendChild(h); return col
+  }
+
+  function renderPropDetail(p) {
+    const host = $("propDetail"); host.innerHTML = ""
+    const h = document.createElement("h2"); h.textContent = p.title
+    const st = document.createElement("span"); st.className = "hint"; st.style.marginLeft = "10px"
+    st.innerHTML = '<span style="color:var(--gold)">' + esc(p.product || p.kind) + "</span> · " + esc(p.status)
+    h.appendChild(st); host.appendChild(h)
+    if (p.thesis_statement) {
+      const ts = document.createElement("div"); ts.style.cssText = "font-style:italic;color:var(--ink-dim);margin:4px 0 10px"
+      ts.textContent = "“" + p.thesis_statement + "”"; host.appendChild(ts)
+    }
+
+    // lifecycle
+    const life = document.createElement("div"); life.className = "acts"; life.style.marginBottom = "10px"
+    for (const s of ["active", "paused", "won", "dropped", "archived"]) {
+      if (s === p.status) continue
+      life.appendChild(mkBtn(s, "btn-snooze", () => setPropStatus(p.id, s)))
+    }
+    host.appendChild(life)
+
+    // stakeholder board
+    host.appendChild(propSection("Stakeholders · by engagement stage"))
+    const board = document.createElement("div"); board.style.cssText = "display:flex;gap:10px;flex-wrap:wrap"
+    for (const stage of ["considering", "latent", "active", "committed"]) {
+      const col = propColumn(STAGE_LABEL[stage], STAGE_COLOR[stage])
+      for (const s of p.stakeholders.filter((x) => x.stage === stage)) col.appendChild(stakeholderCard(p, s))
+      board.appendChild(col)
+    }
+    host.appendChild(board)
+    const inactive = p.stakeholders.filter((x) => x.stage === "declined" || x.stage === "dropped")
+    if (inactive.length) {
+      const inh = document.createElement("div"); inh.className = "hint"; inh.style.marginTop = "8px"
+      inh.textContent = "inactive: " + inactive.map((x) => x.name + " (" + x.stage + ")").join(", "); host.appendChild(inh)
+    }
+    const addWrap = document.createElement("div"); addWrap.id = "addStakeWrap"; addWrap.style.marginTop = "10px"
+    addWrap.appendChild(mkBtn("+ add stakeholder", "btn-edit", () => openAddStakeholder(p))); host.appendChild(addWrap)
+
+    // organizations
+    host.appendChild(propSection("Organizations"))
+    const orgs = document.createElement("div"); orgs.className = "hint"
+    orgs.textContent = p.orgs.length
+      ? p.orgs.map((o) => o.name + (o.role ? " (" + o.role + ")" : "")).join("  ·  ")
+      : "none yet — folding an org-thesis attaches its organization automatically"
+    host.appendChild(orgs)
+
+    // tasks by horizon
+    host.appendChild(propSection("Tasks · by horizon"))
+    const hz = document.createElement("div"); hz.style.cssText = "display:flex;gap:10px;flex-wrap:wrap"
+    for (const horizon of HORIZONS) {
+      const col = propColumn(horizon, null)
+      const lane = p.tasks.filter((x) => x.horizon === horizon)
+      if (!lane.length) { const e = document.createElement("div"); e.className = "hint"; e.textContent = "—"; col.appendChild(e) }
+      for (const t of lane) col.appendChild(taskMini(t))
+      hz.appendChild(col)
+    }
+    host.appendChild(hz)
+
+    // folded theses
+    host.appendChild(propSection("Theses folded in · " + p.theses.length))
+    if (!p.theses.length) { const e = document.createElement("div"); e.className = "hint"; e.textContent = "none — fold one below to enrich this proposition"; host.appendChild(e) }
+    for (const th of p.theses) {
+      const row = document.createElement("div"); row.className = "pending-card"
+      const a = document.createElement("div"); a.style.fontSize = "13.5px"; a.textContent = th.suggested_action; row.appendChild(a)
+      const m = document.createElement("div"); m.className = "hint"; m.style.marginTop = "4px"
+      m.textContent = th.status + (th.fit_flag ? " · " + th.fit_flag : ""); row.appendChild(m)
+      host.appendChild(row)
+    }
+    const foldWrap = document.createElement("div"); foldWrap.style.marginTop = "10px"
+    foldWrap.appendChild(mkBtn("+ fold a pending thesis", "btn-edit", () => openFoldPicker(p))); host.appendChild(foldWrap)
+  }
+
+  function stakeholderCard(p, s) {
+    const c = document.createElement("div"); c.style.cssText = "background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:6px 8px;margin-bottom:6px"
+    const nm = document.createElement("div"); nm.style.cssText = "font-size:13px;font-weight:600"; nm.textContent = s.name; c.appendChild(nm)
+    if (s.role) { const r = document.createElement("div"); r.className = "hint"; r.style.textTransform = "uppercase"; r.textContent = s.role.replace(/_/g, " "); c.appendChild(r) }
+    const sel = document.createElement("select"); sel.style.cssText = "margin-top:5px;font-size:12px;padding:3px 5px;width:100%"
+    for (const st of STAGES) { const o = document.createElement("option"); o.value = st; o.textContent = STAGE_LABEL[st]; if (st === s.stage) o.selected = true; sel.appendChild(o) }
+    sel.addEventListener("change", () => setStage(p.id, s.person_id, sel.value))
+    c.appendChild(sel); return c
+  }
+
+  function taskMini(t) {
+    const c = document.createElement("div"); c.style.cssText = "background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:6px 8px;margin-bottom:6px"
+    const a = document.createElement("div"); a.style.fontSize = "12.5px"; a.textContent = t.current_action; c.appendChild(a)
+    const pill = document.createElement("div"); pill.className = "hint"; pill.style.marginTop = "4px"
+    pill.innerHTML = '<span style="color:' + (TASK_STATUS_COLOR[t.status] || "var(--ink-dim)") + '">● ' + t.status + "</span>"; c.appendChild(pill)
+    if (t.status === "open" || t.status === "stalled") {
+      const acts = document.createElement("div"); acts.className = "acts"; acts.style.marginTop = "5px"
+      const hsel = document.createElement("select"); hsel.style.cssText = "font-size:11px;padding:2px 4px"
+      for (const hh of HORIZONS) { const o = document.createElement("option"); o.value = hh; o.textContent = hh; if (hh === t.horizon) o.selected = true; hsel.appendChild(o) }
+      hsel.addEventListener("change", () => moveTaskHorizon(t.id, hsel.value)); acts.appendChild(hsel)
+      acts.appendChild(mkBtn("✓ done", "btn-accept", () => taskAct(t.id, "completed")))
+      acts.appendChild(mkBtn("✕", "btn-reject", () => taskAct(t.id, "abandoned")))
+      c.appendChild(acts)
+    }
+    return c
+  }
+
+  async function setStage(propId, personId, stage) {
+    try { await api("set_stakeholder_stage", { proposition_id: propId, person_id: personId, stage, comment: "via console propositions tab" }); openProposition(propId) }
+    catch (e) { alert(e.message) }
+  }
+  async function setPropStatus(propId, status) {
+    try { await api("update_proposition", { proposition_id: propId, status }); loadPropositions(); openProposition(propId) }
+    catch (e) { alert(e.message) }
+  }
+  async function moveTaskHorizon(taskId, horizon) {
+    try { await api("update_task", { task_id: taskId, horizon }); openProposition(PROP_OPEN) } catch (e) { alert(e.message) }
+  }
+  async function taskAct(taskId, status) {
+    try { await api("update_task", { task_id: taskId, status, comment: "via console propositions tab" }); openProposition(PROP_OPEN) } catch (e) { alert(e.message) }
+  }
+
+  function openAddStakeholder(p) {
+    const wrap = $("addStakeWrap"); wrap.innerHTML = ""
+    const inp = document.createElement("input"); inp.placeholder = "search a person by name…"; wrap.appendChild(inp)
+    const res = document.createElement("div"); res.style.marginTop = "6px"; wrap.appendChild(res)
+    let timer = null
+    inp.addEventListener("input", () => {
+      clearTimeout(timer); const q = inp.value.trim(); if (q.length < 2) { res.innerHTML = ""; return }
+      timer = setTimeout(async () => {
+        try {
+          const r = await api("search_people", { q }); res.innerHTML = ""
+          for (const person of (r.people || [])) {
+            const name = person.full_name + (person.org ? " · " + person.org : "")
+            const b = mkBtn("+ " + name, "btn-edit", () => addStake(p.id, person.id)); b.style.textAlign = "left"; res.appendChild(b)
+          }
+          if (!(r.people || []).length) res.innerHTML = '<p class="hint">No match.</p>'
+        } catch (e) { res.innerHTML = '<p class="hint">' + e.message + "</p>" }
+      }, 250)
+    })
+    inp.focus()
+  }
+  async function addStake(propId, personId) {
+    try { await api("add_stakeholder", { proposition_id: propId, person_id: personId, stage: "considering" }); openProposition(propId) }
+    catch (e) { alert(e.message) }
+  }
+
+  async function openFoldPicker(p) {
+    let sugs = []
+    try { const r = await api("list_suggestions", {}); sugs = r.suggestions || [] } catch (e) { alert(e.message); return }
+    const wrap = document.createElement("div"); wrap.className = "inline-edit"
+    const lab = document.createElement("label"); lab.textContent = "Fold a pending thesis into this proposition (its org attaches too)"; wrap.appendChild(lab)
+    if (!sugs.length) { const e = document.createElement("p"); e.className = "hint"; e.textContent = "No pending theses right now."; wrap.appendChild(e) }
+    for (const s of sugs.slice(0, 25)) {
+      const b = mkBtn("⤵ " + (s.suggested_action || "(thesis)").slice(0, 100), "btn-edit", () => foldOne(p.id, s.id))
+      b.style.cssText = "text-align:left;display:block;width:100%"; wrap.appendChild(b)
+    }
+    $("propDetail").appendChild(wrap); wrap.scrollIntoView({ block: "nearest" })
+  }
+  async function foldOne(propId, sugId) {
+    try { await api("fold_thesis", { proposition_id: propId, suggestion_id: sugId }); openProposition(propId) }
+    catch (e) { alert(e.message) }
+  }
+
+  async function createProposition() {
+    const title = $("p_title").value.trim()
+    if (!title) { show($("p_createOut"), "Title required", false); return }
+    try {
+      const r = await api("create_proposition", {
+        title, kind: $("p_kind").value,
+        product: $("p_product").value.trim() || null,
+        thesis_statement: $("p_thesis").value.trim() || null,
+      })
+      $("p_title").value = ""; $("p_product").value = ""; $("p_thesis").value = ""
+      show($("p_createOut"), "Created.", true); loadPropositions(); openProposition(r.proposition_id)
+    } catch (e) { show($("p_createOut"), e.message, false) }
+  }
+
   $("unlockBtn").addEventListener("click", unlock)
   $("token").addEventListener("keydown", (e) => { if (e.key === "Enter") unlock() })
   $("addPersonBtn").addEventListener("click", addPerson)
@@ -1398,6 +1646,9 @@
   $("navTasks").addEventListener("click", showTasks)
   $("tasksRefresh").addEventListener("click", loadTasks)
   $("tasksAll").addEventListener("change", loadTasks)
+  $("navPropositions").addEventListener("click", showPropositions)
+  $("propRefresh").addEventListener("click", loadPropositions)
+  $("p_createBtn").addEventListener("click", createProposition)
   $("rm_btn").addEventListener("click", reverseMatch)
   for (const id of ["rm_q", "rm_email", "rm_linkedin", "rm_org"]) {
     $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") reverseMatch() })
