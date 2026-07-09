@@ -1097,18 +1097,30 @@
   // Day 115 Build 2 Slice A: reject reason picker. The code rides in delta; the DB
   // gates calibration (only 'wrong'/absent debits the curve). 'wrong_person' also
   // offers the reattribute branch (Slice C) — correct the subject, keep the inference.
+  // Day 119: + a free-text specific reason (in addition to the tag) and a 5th code
+  // 'off_positioning' (off my thesis / outside my expertise → positioning gate, NOT
+  // calibration). The note is stored in feedback_events.comment (chain-registered) and
+  // reprocessed when the loop learns WHY theses get rejected. Optional; the note applies
+  // to whichever tag is clicked.
   function openReject(id) {
     const slot = $("inlineSlot"); slot.innerHTML = ""
     const lab = document.createElement("label"); lab.textContent = "Why reject? (this routes the signal)"; slot.appendChild(lab)
+    const ta = document.createElement("textarea")
+    ta.id = "rejectReason"; ta.rows = 2; ta.style.width = "100%"; ta.style.marginTop = "8px"
+    ta.placeholder = 'Specific reason (optional) — e.g. "too remote from my expertise AND no close relation to the org"'
+    slot.appendChild(ta)
+    const hint = document.createElement("div"); hint.className = "hint"
+    hint.textContent = "reprocessed when learning why theses get rejected"; slot.appendChild(hint)
     const row = document.createElement("div"); row.className = "acts"; row.style.marginTop = "8px"
     const codes = [
       ["Wrong", "wrong", "false / bad inference → calibration (debits the curve)"],
       ["Not my network", "not_my_network", "true, but no connection to act → eligibility gate (NOT calibration)"],
       ["Not worth it", "not_worth_it", "true, actionable, low value → surfacing threshold (NOT calibration)"],
       ["Wrong person", "wrong_person", "true, but wrong subject → matching (NOT calibration)"],
+      ["Off my positioning", "off_positioning", "true, but not mine to speak to / off my thesis → positioning gate (NOT calibration)"],
     ]
     for (const [label, code, tip] of codes) {
-      const b = mkBtn(label, "btn-reject", () => dispose(id, "rejected", { reason_code: code }))
+      const b = mkBtn(label, "btn-reject", () => dispose(id, "rejected", { reason_code: code, comment: (ta.value || "").trim() || null }))
       b.title = tip
       row.appendChild(b)
     }
