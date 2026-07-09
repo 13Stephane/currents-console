@@ -416,6 +416,14 @@
   </div>
 </div>
 
+<!-- Compose modal (Day 119 step 5) — outreach with the context that earns the send -->
+<div class="pmodal" id="composeModal">
+  <div class="pcard" style="max-width:840px">
+    <button class="ghost mini pclose" id="composeClose">✕ close</button>
+    <div id="composeBody"><p class="hint">Loading…</p></div>
+  </div>
+</div>
+
 <script>
   const API = "https://axgxmsbfjetzcnwosvpl.supabase.co/functions/v1/console"
   const $ = (id) => document.getElementById(id)
@@ -1534,7 +1542,10 @@
     const sel = document.createElement("select"); sel.style.cssText = "margin-top:5px;font-size:12px;padding:3px 5px;width:100%"
     for (const st of STAGES) { const o = document.createElement("option"); o.value = st; o.textContent = STAGE_LABEL[st]; if (st === s.stage) o.selected = true; sel.appendChild(o) }
     sel.addEventListener("change", () => setStage(p.id, s.person_id, sel.value))
-    c.appendChild(sel); return c
+    c.appendChild(sel)
+    const cb = mkBtn("✉ compose", "btn-edit", () => openCompose(s.person_id, s.name, p.id))
+    cb.style.cssText = "margin-top:5px;font-size:11px;padding:4px 8px"; c.appendChild(cb)
+    return c
   }
 
   function taskMini(t) {
@@ -1625,6 +1636,73 @@
     } catch (e) { show($("p_createOut"), e.message, false) }
   }
 
+  // ---- Compose (Day 119 step 5): outreach with the context that earns the send ----
+  let COMPOSE = null
+  async function openCompose(personId, name, propId) {
+    COMPOSE = { personId, name, propId: propId || null }
+    $("composeModal").classList.add("show")
+    const host = $("composeBody"); host.innerHTML = '<p class="hint">Loading context…</p>'
+    try { const r = await api("compose_context", { person_id: personId, proposition_id: propId || null }); renderCompose(r.context) }
+    catch (e) { host.innerHTML = '<p class="hint">' + esc(e.message) + "</p>" }
+  }
+  function closeCompose() { $("composeModal").classList.remove("show"); COMPOSE = null }
+
+  function renderCompose(ctx) {
+    const host = $("composeBody"); host.innerHTML = ""
+    const p = ctx.person || {}
+    const h = document.createElement("h2"); h.textContent = "Compose → " + (p.name || "person"); host.appendChild(h)
+    const wrap = document.createElement("div"); wrap.style.cssText = "display:flex;gap:16px;flex-wrap:wrap;margin-top:10px"
+
+    // left — the editable draft
+    const left = document.createElement("div"); left.style.cssText = "flex:1.1;min-width:260px"
+    const subL = document.createElement("label"); subL.textContent = "Subject"; left.appendChild(subL)
+    const sub = document.createElement("input"); sub.id = "compose_subject"
+    if (ctx.proposition && ctx.proposition.title) sub.value = ctx.proposition.title
+    left.appendChild(sub)
+    const bodyL = document.createElement("label"); bodyL.textContent = "Draft"; left.appendChild(bodyL)
+    const bd = document.createElement("textarea"); bd.id = "compose_body"; bd.rows = 11
+    bd.value = p.name ? (p.name.split(" ")[0] + " —\n\n") : ""
+    left.appendChild(bd)
+    const acts = document.createElement("div"); acts.className = "acts"; acts.style.marginTop = "8px"
+    acts.appendChild(mkBtn("Copy & mark sent", "btn-accept", () => sendCompose(true)))
+    acts.appendChild(mkBtn("Mark sent", "btn-edit", () => sendCompose(false)))
+    left.appendChild(acts)
+    const out = document.createElement("div"); out.className = "out"; out.id = "compose_out"; out.style.marginTop = "8px"; left.appendChild(out)
+    const note = document.createElement("div"); note.className = "hint"; note.style.marginTop = "6px"
+    note.textContent = "Copy pastes the draft into your clipboard for Gmail; both record a chain-registered outreach touch."
+    left.appendChild(note)
+    wrap.appendChild(left)
+
+    // right — the context that makes it non-generic
+    const right = document.createElement("div"); right.style.cssText = "flex:1;min-width:230px;background:rgba(255,255,255,.02);border:1px solid var(--line);border-radius:6px;padding:10px"
+    const block = (title, items) => {
+      if (!items || !items.length) return
+      const t = document.createElement("div"); t.className = "hint"
+      t.style.cssText = "text-transform:uppercase;letter-spacing:.1em;margin:8px 0 4px;color:var(--ink-faint)"; t.textContent = title; right.appendChild(t)
+      for (const it of items) { const d = document.createElement("div"); d.style.cssText = "font-size:12.5px;color:var(--ink-dim);margin-bottom:4px;line-height:1.4"; d.textContent = it; right.appendChild(d) }
+    }
+    if (ctx.proposition && ctx.proposition.thesis_statement) block("Why now — thesis", ["“" + ctx.proposition.thesis_statement + "”"])
+    const who = []; if (p.current_org) who.push(p.current_org); if (p.location) who.push(p.location)
+    block("Who", who.length ? [who.join(" · ")] : null)
+    block("Drivers", ctx.drivers)
+    block("Needs", ctx.needs)
+    block("Recent history", (ctx.history || []).map((hh) => (hh.excerpt || "").replace(/\s+/g, " ").trim().slice(0, 130)))
+    block("Bring", (ctx.assets || []).map((a) => a.title + (a.kind ? " (" + a.kind + ")" : "")))
+    wrap.appendChild(right)
+    host.appendChild(wrap)
+  }
+
+  async function sendCompose(copy) {
+    if (!COMPOSE) return
+    const subject = $("compose_subject").value.trim(), bodyTxt = $("compose_body").value.trim()
+    if (!bodyTxt) { show($("compose_out"), "Write a draft first.", false); return }
+    if (copy) { try { await navigator.clipboard.writeText((subject ? subject + "\n\n" : "") + bodyTxt) } catch (e) { /* clipboard may be blocked */ } }
+    try {
+      await api("record_outreach", { person_id: COMPOSE.personId, subject, body: bodyTxt, proposition_id: COMPOSE.propId, via: "manual" })
+      show($("compose_out"), copy ? "Copied to clipboard · outreach recorded." : "Outreach recorded.", true)
+    } catch (e) { show($("compose_out"), e.message, false) }
+  }
+
   $("unlockBtn").addEventListener("click", unlock)
   $("token").addEventListener("keydown", (e) => { if (e.key === "Enter") unlock() })
   $("addPersonBtn").addEventListener("click", addPerson)
@@ -1649,6 +1727,7 @@
   $("navPropositions").addEventListener("click", showPropositions)
   $("propRefresh").addEventListener("click", loadPropositions)
   $("p_createBtn").addEventListener("click", createProposition)
+  $("composeClose").addEventListener("click", closeCompose)
   $("rm_btn").addEventListener("click", reverseMatch)
   for (const id of ["rm_q", "rm_email", "rm_linkedin", "rm_org"]) {
     $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") reverseMatch() })
