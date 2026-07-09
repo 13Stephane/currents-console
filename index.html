@@ -1,0 +1,1404 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Currents · console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: rgb(25,60,63); --bg-2: rgb(21,52,55); --ink: rgb(244,240,233);
+    --ink-dim: rgba(244,240,233,.62); --ink-faint: rgba(244,240,233,.32);
+    --gold: rgb(198,165,83); --line: rgba(244,240,233,.14);
+    --green: #86b896; --reject: #cf8e76;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 16px; line-height: 1.5; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 48px 24px 72px; }
+  .mono { font-family: "IBM Plex Mono", "SF Mono", ui-monospace, Menlo, monospace; }
+  .head { display: flex; align-items: baseline; justify-content: space-between; gap: 18px;
+    border-bottom: 1px solid var(--line); padding-bottom: 16px; margin-bottom: 28px; flex-wrap: wrap; }
+  h1 { font-weight: 400; font-size: 26px; letter-spacing: -.01em; margin: 0; }
+  h1 em { font-style: italic; color: var(--gold); font-weight: 400; }
+  .sub { font-family: "IBM Plex Mono", monospace; font-size: 10.5px; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--ink-faint); }
+  .panel { border: 1px solid var(--line); border-radius: 3px; padding: 24px 26px;
+    margin-bottom: 18px; background: rgba(244,240,233,.02); }
+  .panel h2 { font-size: 18px; font-weight: 400; margin: 0 0 16px; letter-spacing: .01em; }
+  label { display: block; font-family: "IBM Plex Mono", monospace; font-size: 10px;
+    letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); margin: 14px 0 5px; }
+  input, textarea, select {
+    width: 100%; background: rgba(244,240,233,.04); border: 1px solid var(--line);
+    color: var(--ink); border-radius: 3px; padding: 10px 12px; font-size: 15px;
+    font-family: Georgia, serif;
+  }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--gold); }
+  textarea { resize: vertical; min-height: 68px; line-height: 1.45; }
+  button {
+    font-family: "IBM Plex Mono", monospace; font-size: 12px; letter-spacing: .04em;
+    background: var(--gold); color: var(--bg); border: 1px solid var(--gold); border-radius: 2px;
+    padding: 9px 18px; cursor: pointer; margin-top: 18px; transition: border-color .15s, color .15s, background .15s;
+  }
+  button.ghost { background: transparent; color: var(--ink-dim); border-color: var(--line); }
+  button.ghost:hover { border-color: var(--gold); color: var(--ink); }
+  button:active { transform: translateY(1px); }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .row > * { flex: 1; min-width: 150px; }
+  .out { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; line-height: 1.5;
+    margin-top: 16px; padding: 11px 13px; border-radius: 3px; white-space: pre-wrap; display: none; }
+  .out.ok { display: block; background: rgba(198,165,83,.10); border: 1px solid rgba(198,165,83,.4); color: var(--ink-dim); }
+  .out.err { display: block; background: rgba(207,142,118,.10); border: 1px solid var(--reject); color: var(--reject); }
+  .gate { display: flex; gap: 12px; align-items: flex-end; }
+  .gate > div { flex: 1; }
+  .gate input { font-family: "IBM Plex Mono", monospace; }
+  .gate button { margin-top: 0; }
+  .pending-card { border: 1px dashed var(--line); border-radius: 3px; padding: 15px 16px;
+    margin-top: 12px; background: rgba(21,52,55,.5); }
+  .pending-card .who { font-family: "IBM Plex Mono", monospace; font-size: 13px; }
+  .pending-card .cand { display: flex; gap: 9px; align-items: center; margin-top: 7px; font-size: 14px; color: var(--ink-dim); }
+  .hint { color: var(--ink-faint); font-size: 12px; font-family: "IBM Plex Mono", monospace; line-height: 1.5; }
+  .hidden { display: none; }
+  .mini { margin: 0; padding: 4px 10px; font-size: 11px; }
+
+  /* §3.4 disposal surface — view nav + split-reader (Layout C) */
+  .nav { display: flex; gap: 8px; margin-bottom: 26px; }
+  .nav button { margin-top: 0; background: transparent; color: var(--ink-dim); border-color: var(--line); }
+  .nav button.active { border-color: var(--gold); color: var(--ink); }
+  body.wide .wrap { max-width: 1180px; }
+  .split { display: grid; grid-template-columns: 312px minmax(0,1fr) 290px; gap: 18px; align-items: start; }
+  @media (max-width: 940px) { .split { grid-template-columns: 1fr; } }
+  .col { border: 1px solid var(--line); border-radius: 3px; background: rgba(244,240,233,.02); }
+  .col-h { font-family: "IBM Plex Mono", monospace; font-size: 10px; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--ink-faint); padding: 14px 16px 10px; }
+  /* width:100% is load-bearing: overflow-y makes .rail a scroll container, and a
+     scroll-container block child of a grid-track column shrinks to its content's
+     min-content width (thesis wraps one-word-per-line) unless given an explicit
+     width. Without it the rail collapses to ~105px inside its 312px column. */
+  .rail { max-height: 72vh; overflow-y: auto; width: 100%; }
+  .rail-item { padding: 13px 16px; border-top: 1px solid var(--line); cursor: pointer; }
+  .rail-item:hover { background: rgba(244,240,233,.03); }
+  .rail-item.sel { background: rgba(198,165,83,.08); box-shadow: inset 2px 0 0 var(--gold); }
+  .rail-item .rclaim { font-size: 13.5px; line-height: 1.42; }
+  .rail-item .rmeta { font-family: "IBM Plex Mono", monospace; font-size: 9.5px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--ink-faint); margin-top: 7px; display: flex; align-items: center; gap: 8px; }
+  .detail { padding: 26px 28px; min-height: 240px; }
+  .detail .subject { font-family: "IBM Plex Mono", monospace; font-size: 10.5px; letter-spacing: .15em;
+    text-transform: uppercase; color: var(--ink-faint); }
+  .detail .claim { font-size: 21px; line-height: 1.46; margin: 12px 0 16px; }
+  .detail .rationale { color: var(--ink-dim); font-size: 14px; line-height: 1.5; margin-bottom: 8px; }
+  .detail .sugact { color: var(--ink-dim); font-size: 13.5px; font-style: italic; margin: 10px 0 18px; }
+  /* asset to bring (Day 100) — the resonator-linked content for this surfacing */
+  .detail .asset-bring { display: flex; align-items: baseline; gap: 8px; margin: 0 0 16px;
+    padding: 10px 12px; border: 1px solid var(--line); border-left: 2px solid var(--gold);
+    border-radius: 6px; background: rgba(198,165,83,.04); }
+  .detail .asset-bring .ab-lead { font-family: "IBM Plex Mono", monospace; font-size: 9px;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); flex: none; }
+  .detail .asset-bring .ab-title { font-size: 13.5px; color: var(--ink); }
+  .detail .asset-bring .ab-kind { font-family: "IBM Plex Mono", monospace; font-size: 9px;
+    letter-spacing: .1em; text-transform: uppercase; color: var(--ink-dim); }
+  .rail-item .rasset { color: var(--gold); font-size: 11px; margin-left: 6px; }
+  /* review-cadence nudge (Day 102) — pending queue + TTL urgency, at the disposal surface */
+  .review-banner { margin: 0 0 16px; padding: 12px 16px; border: 1px solid var(--line);
+    border-radius: 6px; font-size: 13.5px; line-height: 1.5; color: var(--ink-dim); }
+  .review-banner.urgent { border-color: var(--gold); border-left: 2px solid var(--gold);
+    background: rgba(198,165,83,.08); color: var(--ink); }
+  .review-banner.clear { color: var(--ink-faint); font-style: italic; }
+  .review-banner .rb-strong { font-weight: 600; color: var(--gold); }
+  .review-banner.hidden { display: none; }
+  .asset-filter { float: right; font-family: "IBM Plex Mono", monospace; font-size: 10px;
+    letter-spacing: .06em; text-transform: uppercase; color: var(--ink-dim); cursor: pointer;
+    display: inline-flex; align-items: center; gap: 5px; margin-top: -1px; }
+  .acts { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+  .acts button { margin-top: 0; }
+  .btn-accept { background: var(--green); border-color: var(--green); color: var(--bg); }
+  .btn-reject { background: transparent; border-color: var(--reject); color: var(--reject); }
+  .btn-edit, .btn-snooze { background: transparent; border-color: var(--line); color: var(--ink-dim); }
+  .inline-edit { margin-top: 16px; }
+  .amended-tag { font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: .04em; color: var(--gold, #b8860b); text-transform: uppercase; }
+  .search-results { margin: 4px 0 8px; }
+  .search-hit { padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 4px; cursor: pointer; background: var(--panel, transparent); }
+  .search-hit:hover { border-color: var(--gold, #b8860b); }
+  .sh-name { font-weight: 600; }
+  .sh-meta { font-family: "IBM Plex Mono", monospace; font-size: 11px; color: var(--ink-dim, #888); margin-top: 2px; }
+  .ev-item { padding: 12px 16px; border-top: 1px solid var(--line); }
+  .ev-item a { color: var(--gold); text-decoration: none; font-size: 13px; line-height: 1.4; }
+  .ev-item a:hover { text-decoration: underline; }
+  .ev-item .esum { color: var(--ink-dim); font-size: 11.5px; line-height: 1.45; margin-top: 5px; }
+  .ev-item .ekind { font-family: "IBM Plex Mono", monospace; font-size: 9px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--ink-faint); margin-top: 6px; }
+  /* confidence chip (A.1) — calibration state, never the raw number */
+  .chip { display: inline-flex; align-items: center; gap: 9px; font-family: "IBM Plex Mono", monospace;
+    font-size: 10px; letter-spacing: .12em; text-transform: uppercase; cursor: help; }
+  .chip .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .chip.grey .dot { background: var(--ink-faint); }
+  .chip.amber .dot { background: var(--gold); }
+  .chip.green .dot { background: var(--green); }
+  .chip .state { color: var(--ink-dim); }
+  .chip .arr { letter-spacing: 2px; color: var(--ink); }
+  .chip .qual { color: var(--ink-dim); text-transform: none; letter-spacing: .02em; font-style: italic; }
+  .chip.mini-chip { font-size: 8.5px; gap: 6px; }
+  .chip.mini-chip .dot { width: 6px; height: 6px; }
+  .empty { color: var(--ink-faint); font-size: 13px; font-family: "IBM Plex Mono", monospace; padding: 18px 16px; }
+  /* Person profile modal (Build 1, Day 114) — a read-only detail panel reachable
+     from any search / reverse-match result. Confidence never rendered raw: open
+     hypotheses carry the empirical band, not the model number. */
+  .pmodal { position: fixed; inset: 0; background: rgba(12,30,32,.72); z-index: 50;
+    display: none; align-items: flex-start; justify-content: center; overflow-y: auto; padding: 40px 16px; }
+  .pmodal.show { display: flex; }
+  .pcard { background: var(--bg-2); border: 1px solid var(--line); border-radius: 5px;
+    max-width: 640px; width: 100%; padding: 26px 28px 30px; box-shadow: 0 18px 60px rgba(0,0,0,.4); }
+  .pcard .pclose { float: right; margin: 0; }
+  .pname { font-size: 22px; font-weight: 400; margin: 0 0 3px; letter-spacing: -.01em; }
+  .pident { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--ink-dim); margin-bottom: 4px; }
+  .pbg { font-size: 14px; color: var(--ink-dim); font-style: italic; margin: 10px 0 4px; line-height: 1.45; }
+  .psec { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 14px; }
+  .psec h3 { font-family: "IBM Plex Mono", monospace; font-size: 10px; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--ink-faint); margin: 0 0 10px; font-weight: 400; }
+  .psec h3 .n { color: var(--ink-dim); }
+  .prow { margin-bottom: 9px; font-size: 14px; line-height: 1.45; }
+  .prow .lead { color: var(--ink); }
+  .prow .side { font-family: "IBM Plex Mono", monospace; font-size: 10.5px; color: var(--ink-faint); }
+  .pint { border-left: 2px solid var(--line); padding-left: 11px; margin-bottom: 11px; }
+  .pint .ihdr { font-family: "IBM Plex Mono", monospace; font-size: 10px; color: var(--ink-faint);
+    letter-spacing: .04em; margin-bottom: 3px; }
+  .pint .idir { color: var(--gold); }
+  .pint .ibody { font-size: 13.5px; color: var(--ink-dim); line-height: 1.5; white-space: pre-wrap; }
+  .phyp { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 9px; font-size: 13.5px; line-height: 1.4; }
+  .phyp .hclaim { flex: 1; color: var(--ink-dim); }
+  .pband { display: inline-flex; align-items: center; gap: 6px; font-family: "IBM Plex Mono", monospace;
+    font-size: 8.5px; letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; flex: none; margin-top: 2px; }
+  .pband .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .pband.grey .dot { background: var(--ink-faint); }
+  .pband.amber .dot { background: var(--gold); }
+  .pband.green .dot { background: var(--green); }
+  .pband .lbl { color: var(--ink-dim); }
+  .sh-profile { float: right; margin: 0; padding: 3px 9px; font-size: 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <h1>Currents · the <em>operator</em> console</h1>
+    <span class="sub">system proposes · human disposes</span>
+  </div>
+
+  <div class="panel" id="gatePanel">
+    <h2>Unlock</h2>
+    <div class="gate">
+      <div>
+        <label>Console token</label>
+        <input id="token" type="password" placeholder="CONSOLE_TOKEN" autocomplete="off">
+      </div>
+      <button id="unlockBtn">Unlock</button>
+    </div>
+    <p class="hint" id="gateHint" style="margin-top:12px"></p>
+  </div>
+
+  <div id="app" class="hidden">
+    <div class="nav">
+      <button id="navAdd" class="active">Add</button>
+      <button id="navDispose">Dispose</button>
+      <button id="navLookup">Lookup</button>
+      <button id="navInitiatives">Initiatives</button>
+      <button id="navTasks">Tasks</button>
+    </div>
+
+    <div id="addView">
+    <div class="panel">
+      <h2>Add person</h2>
+      <label>Full name *</label>
+      <input id="p_name" placeholder="Jane Doe">
+      <div class="row">
+        <div><label>Primary email</label><input id="p_email" placeholder="jane@acme.com"></div>
+        <div><label>LinkedIn URL</label><input id="p_linkedin" placeholder="linkedin.com/in/…"></div>
+      </div>
+      <div class="row">
+        <div><label>Location</label><input id="p_location" placeholder="Stockholm"></div>
+      </div>
+      <label>Background / context</label>
+      <textarea id="p_background" placeholder="How you know them, what they do…"></textarea>
+      <button id="addPersonBtn">Add to spine</button>
+      <div class="out" id="p_out"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Log a note</h2>
+      <p class="hint">Raw signal into person_raw_inputs — the fuel person-listener extracts from. Search for the person, or it auto-fills after an add.</p>
+      <label>Find person</label>
+      <input id="n_search" placeholder="Type a name…" autocomplete="off">
+      <div id="n_results" class="search-results"></div>
+      <label>Person ID</label>
+      <input id="n_person" placeholder="select above, or paste a uuid">
+      <div class="row">
+        <div><label>Kind</label>
+          <select id="n_kind">
+            <option>personal_notes</option><option>linkedin_about</option>
+            <option>linkedin_headline</option><option>linkedin_posts</option>
+          </select>
+        </div>
+      </div>
+      <label>Text *</label>
+      <textarea id="n_text" placeholder="What happened / what you learned…"></textarea>
+      <button id="addNoteBtn">Append</button>
+      <div class="out" id="n_out"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Add organization</h2>
+      <label>Name *</label>
+      <input id="o_name" placeholder="Acme AB">
+      <div class="row">
+        <div><label>Domain</label><input id="o_domain" placeholder="acme.com"></div>
+        <div><label>Country</label><input id="o_country" placeholder="SE"></div>
+      </div>
+      <div class="row">
+        <div><label>Industry</label><input id="o_industry" placeholder="manufacturing"></div>
+      </div>
+      <button id="addOrgBtn">Add to spine</button>
+      <div class="out" id="o_out"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Add asset</h2>
+      <p class="hint">Your own content — value props, writings, talks. The resonator scores these against world-events; outreach-composer cites them. Not derived from the spine — this is the only way to seed them.</p>
+      <label>Title *</label>
+      <input id="a_title" placeholder="e.g. AI strategy advisory for biotech R&amp;D">
+      <div class="row">
+        <div><label>Kind</label>
+          <select id="a_kind">
+            <option>value_proposition</option><option>offering</option>
+            <option>case_study</option><option>writing</option>
+            <option>talk</option><option>credential</option><option>bio</option>
+            <option value="__other">Other…</option>
+          </select>
+        </div>
+      </div>
+      <input id="a_kind_other" placeholder="custom kind" style="display:none">
+      <label>Summary</label>
+      <textarea id="a_summary" placeholder="One line — what it is / the value…"></textarea>
+      <label>Body</label>
+      <textarea id="a_body" placeholder="Full content / description…"></textarea>
+      <div class="row">
+        <div><label>URL</label><input id="a_url" placeholder="https://…"></div>
+        <div><label>Tags (comma-separated)</label><input id="a_tags" placeholder="ai, strategy, biotech"></div>
+      </div>
+      <button id="addAssetBtn">Add asset</button>
+      <div class="out" id="a_out"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Asset library <button class="ghost mini" id="libRefreshBtn" style="margin-left:10px">load / refresh</button></h2>
+      <p class="hint">Your seeded assets, ordered by the resonator's live relevance score. Click “edit” to revise one (re-embeds on save when title/summary/body change).</p>
+      <div id="library" style="margin-top:10px"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Ambiguous matches <button class="ghost mini" id="refreshBtn" style="margin-left:10px">refresh</button></h2>
+      <p class="hint">Same-name twins routed for human disposal (§3.6). Never auto-merged.</p>
+      <div id="pending" style="margin-top:10px"></div>
+    </div>
+    </div><!-- /addView -->
+
+    <div id="disposeView" class="hidden">
+      <div id="reviewBanner" class="review-banner hidden"></div>
+      <div class="split">
+        <div class="col">
+          <div class="col-h">Pending <span id="sugCount"></span> <button class="ghost mini" id="dispRefresh" style="float:right;margin-top:-3px">refresh</button><label class="asset-filter" title="Show only proposals that name an asset to bring"><input type="checkbox" id="assetOnly"> ◈ asset-linked</label></div>
+          <div class="rail" id="rail"></div>
+        </div>
+        <div class="col detail" id="detail">
+          <p class="empty">Select a claim from the rail to dispose.</p>
+        </div>
+        <div class="col">
+          <div class="col-h">Why · provenance</div>
+          <div id="evidence"><p class="empty">—</p></div>
+        </div>
+      </div>
+    </div><!-- /disposeView -->
+
+    <div id="lookupView" class="hidden">
+    <div class="panel">
+      <h2>Reverse-match</h2>
+      <p class="hint">Paste what you have — a name, email, LinkedIn URL, or org — and see who you already know. Read-only: keys (email / LinkedIn) resolve precisely; a name alone surfaces every twin for you to pick (never auto-matched).</p>
+      <label>Name</label>
+      <input id="rm_q" placeholder="Jane Doe" autocomplete="off">
+      <div class="row">
+        <div><label>Email</label><input id="rm_email" placeholder="jane@acme.com" autocomplete="off"></div>
+        <div><label>LinkedIn URL</label><input id="rm_linkedin" placeholder="linkedin.com/in/…" autocomplete="off"></div>
+      </div>
+      <div class="row">
+        <div><label>Organization</label><input id="rm_org" placeholder="Acme AB" autocomplete="off"></div>
+      </div>
+      <button id="rm_btn">Match</button>
+      <div class="out" id="rm_out"></div>
+      <div id="rm_results" class="search-results" style="margin-top:14px"></div>
+    </div>
+    </div><!-- /lookupView -->
+
+    <div id="initiativesView" class="hidden">
+    <div class="panel">
+      <h2>Declare an initiative</h2>
+      <p class="hint">A top-down theme dispatched as <em>individuated</em> fit-hypotheses — never a mail-merge. Currents embeds the intent, ranks people by how their current drivers/needs fit it, and composes one grounded fit-claim per person that rides the normal disposal feed. <strong>Step 1: dry-run</strong> to read the fit distribution and pick a floor from data. <strong>Step 2: dispatch</strong> at that floor.</p>
+      <label>Intent *</label>
+      <textarea id="i_intent" placeholder="e.g. AI in professional-service firms: job-design &amp; transformation"></textarea>
+      <div class="row">
+        <div><label>Sample limit</label><input id="i_limit" value="100"></div>
+      </div>
+      <button id="i_dryBtn">Dry-run · preview fit</button>
+      <div class="out" id="i_dry_out"></div>
+      <div id="i_dist" class="hidden" style="margin-top:16px"></div>
+      <div id="i_cands" class="search-results" style="margin-top:10px"></div>
+    </div>
+
+    <div class="panel hidden" id="i_dispatchPanel">
+      <h2>Dispatch live</h2>
+      <p class="hint">⚠ This writes: it creates the initiative, composes a fit-claim per candidate (up to the cap), and routes each into your pending feed. Routing writes the audit chain — a live dispatch owes a verify + anchor at close.</p>
+      <label>Title *</label>
+      <input id="i_title" placeholder="short name for this initiative">
+      <div class="row">
+        <div><label>Floor (from distribution)</label><input id="i_floor" placeholder="e.g. 0.45"></div>
+        <div><label>Weak-fit below</label><input id="i_weak" placeholder="e.g. 0.50 (optional)"></div>
+        <div><label>Cap (max people)</label><input id="i_cap" value="8"></div>
+      </div>
+      <button id="i_liveBtn">Dispatch initiative</button>
+      <div class="out" id="i_live_out"></div>
+      <div id="i_results" style="margin-top:10px"></div>
+    </div>
+    </div><!-- /initiativesView -->
+
+    <div id="tasksView" class="hidden">
+    <div class="panel">
+      <h2>Tasks <button class="ghost mini" id="tasksRefresh" style="margin-left:10px">refresh</button>
+        <label class="asset-filter" style="float:right" title="Include completed/abandoned"><input type="checkbox" id="tasksAll"> show resolved</label>
+      </h2>
+      <p class="hint">What you committed to when you accepted a proposition. Accepting or editing a suggestion spawns a task here; <strong>Complete</strong> / <strong>Abandon</strong> is the outcome signal the learning loop grades against. <strong>Stall</strong> parks it without resolving. Editing the action text alone records no signal.</p>
+      <div id="tasksList" style="margin-top:12px"></div>
+    </div>
+    </div><!-- /tasksView -->
+  </div>
+</div>
+
+<!-- Person profile modal (Build 1, Day 114) — read-only detail, opened from any result row -->
+<div class="pmodal" id="profileModal">
+  <div class="pcard">
+    <button class="ghost mini pclose" id="profileClose">✕ close</button>
+    <div id="profileBody"><p class="hint">Loading…</p></div>
+  </div>
+</div>
+
+<script>
+  const API = "https://axgxmsbfjetzcnwosvpl.supabase.co/functions/v1/console"
+  const $ = (id) => document.getElementById(id)
+  let TOKEN = sessionStorage.getItem("console_token") || ""
+
+  function show(el, msg, ok) {
+    el.textContent = msg
+    el.className = "out " + (ok ? "ok" : "err")
+  }
+
+  async function api(op, payload) {
+    const res = await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-console-token": TOKEN },
+      body: JSON.stringify(Object.assign({ op }, payload)),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || ("HTTP " + res.status))
+    return data
+  }
+
+  function enterApp() {
+    $("gatePanel").classList.add("hidden")
+    $("app").classList.remove("hidden")
+    // Land on Dispose, not Add — disposal is the operator's primary act (system
+    // proposes, human disposes), and the feed is no longer empty (28+ pending).
+    showDispose()
+  }
+
+  async function unlock() {
+    TOKEN = $("token").value.trim()
+    if (!TOKEN) return
+    try {
+      const r = await api("list_pending", {})
+      sessionStorage.setItem("console_token", TOKEN)
+      enterApp()
+      renderPending(r.pending, r.names)
+    } catch (e) {
+      $("gateHint").textContent = e.message
+    }
+  }
+
+  async function addPerson() {
+    try {
+      const r = await api("add_person", {
+        full_name: $("p_name").value,
+        primary_email: $("p_email").value,
+        linkedin_url: $("p_linkedin").value,
+        location: $("p_location").value,
+        background: $("p_background").value,
+      })
+      const res = r.result || {}
+      if (res.match_basis === "routed_pending" || res.person_id == null) {
+        show($("p_out"), "Routed to ambiguous matches (same-name twin). Resolve below.", true)
+        loadPending()
+      } else {
+        const verb = res.matched ? "matched existing" : "created new"
+        show($("p_out"), verb + " · " + res.match_basis + "\nperson_id: " + res.person_id, true)
+        $("n_person").value = res.person_id
+      }
+    } catch (e) { show($("p_out"), e.message, false) }
+  }
+
+  async function addNote() {
+    try {
+      const r = await api("add_note", {
+        person_id: $("n_person").value.trim(),
+        kind: $("n_kind").value,
+        raw_text: $("n_text").value,
+      })
+      show($("n_out"), "appended · raw_input_id: " + r.raw_input_id, true)
+      $("n_text").value = ""
+    } catch (e) { show($("n_out"), e.message, false) }
+  }
+
+  let nSearchTimer = null
+  function onPersonSearch() {
+    clearTimeout(nSearchTimer)
+    const q = $("n_search").value.trim()
+    const host = $("n_results"); host.innerHTML = ""
+    if (q.length < 2) return
+    nSearchTimer = setTimeout(async () => {
+      try {
+        const r = await api("search_people", { q })
+        host.innerHTML = ""
+        if (!r.people || !r.people.length) { host.innerHTML = '<p class="hint">No match.</p>'; return }
+        for (const p of r.people) {
+          const item = document.createElement("div"); item.className = "search-hit"
+          addProfileBtn(item, p.id)
+          const nm = document.createElement("div"); nm.className = "sh-name"; nm.textContent = p.full_name
+          const meta = [p.org, p.email, p.location].filter(Boolean).join(" · ")
+          item.appendChild(nm)
+          if (meta) { const m = document.createElement("div"); m.className = "sh-meta"; m.textContent = meta; item.appendChild(m) }
+          item.addEventListener("click", () => {
+            $("n_person").value = p.id
+            $("n_search").value = p.full_name
+            host.innerHTML = ""
+            show($("n_out"), "selected " + p.full_name + " · " + p.id, true)
+          })
+          host.appendChild(item)
+        }
+      } catch (e) { host.innerHTML = ""; show($("n_out"), e.message, false) }
+    }, 250)
+  }
+
+  async function addOrg() {
+    try {
+      const r = await api("add_org", {
+        name: $("o_name").value,
+        domain: $("o_domain").value,
+        country: $("o_country").value,
+        industry: $("o_industry").value,
+      })
+      const res = r.result || {}
+      const verb = res.matched ? "matched existing" : "created new"
+      show($("o_out"), verb + " · " + res.match_basis + "\norg_id: " + res.org_id, true)
+    } catch (e) { show($("o_out"), e.message, false) }
+  }
+
+  async function addAsset() {
+    try {
+      let kind = $("a_kind").value
+      if (kind === "__other") kind = $("a_kind_other").value
+      const r = await api("add_asset", {
+        title: $("a_title").value,
+        kind,
+        summary: $("a_summary").value,
+        body: $("a_body").value,
+        url: $("a_url").value,
+        tags: $("a_tags").value,
+      })
+      const warn = r.embedded ? " · embedded" : " · ⚠ NO embedding (Voyage unavailable) — invisible to semantic match"
+      show($("a_out"), "added · kind: " + r.kind + warn + "\nasset_id: " + r.asset_id, true)
+    } catch (e) { show($("a_out"), e.message, false) }
+  }
+
+  function libField(label, value, tag, multiline) {
+    const wrap = document.createElement("div")
+    const l = document.createElement("label"); l.textContent = label; wrap.appendChild(l)
+    const inp = document.createElement(multiline ? "textarea" : "input")
+    inp.value = value == null ? "" : value
+    inp.setAttribute("data-f", tag)
+    wrap.appendChild(inp)
+    return { wrap, inp }
+  }
+
+  async function renderLibrary() {
+    const box = $("library"); box.textContent = "loading…"
+    try {
+      const r = await api("list_assets", {})
+      box.innerHTML = ""
+      if (!r.assets || !r.assets.length) { box.textContent = "No assets yet."; return }
+      for (const a of r.assets) {
+        const row = document.createElement("div"); row.className = "search-hit"
+        const head = document.createElement("div")
+        const t = document.createElement("strong"); t.textContent = a.title; head.appendChild(t)
+        const rel = (a.relevance_score != null) ? Number(a.relevance_score).toFixed(2) : "—"
+        const meta = document.createElement("span"); meta.className = "hint"
+        meta.textContent = "  [" + a.kind + "] · rel " + rel + (a.status && a.status !== "active" ? " · " + a.status : "")
+        head.appendChild(meta)
+        const editBtn = document.createElement("button"); editBtn.className = "ghost mini"; editBtn.style.marginLeft = "10px"; editBtn.textContent = "edit"
+        head.appendChild(editBtn); row.appendChild(head)
+        if (a.relevance_rationale) { const rat = document.createElement("div"); rat.className = "hint"; rat.textContent = a.relevance_rationale; row.appendChild(rat) }
+
+        const orig = { title: a.title || "", summary: a.summary || "", body: a.body || "", tags: (a.tags || []).join(", "), status: a.status || "active" }
+        const form = document.createElement("div"); form.style.display = "none"; form.style.marginTop = "8px"
+        const fields = {
+          title: libField("Title", orig.title, "title"),
+          summary: libField("Summary", orig.summary, "summary", true),
+          body: libField("Body", orig.body, "body", true),
+          tags: libField("Tags (comma-separated)", orig.tags, "tags"),
+          status: libField("Status", orig.status, "status"),
+        }
+        Object.values(fields).forEach((f) => form.appendChild(f.wrap))
+        const save = document.createElement("button"); save.className = "mini"; save.textContent = "Save"
+        const out = document.createElement("span"); out.className = "hint"; out.style.marginLeft = "10px"
+        form.appendChild(save); form.appendChild(out); row.appendChild(form)
+
+        editBtn.addEventListener("click", () => { form.style.display = form.style.display === "none" ? "block" : "none" })
+        save.addEventListener("click", async () => {
+          const patch = { id: a.id }
+          for (const k of Object.keys(fields)) { if (fields[k].inp.value !== orig[k]) patch[k] = fields[k].inp.value }
+          if (Object.keys(patch).length === 1) { out.textContent = "no changes"; return }
+          out.textContent = "saving…"
+          try { const res = await api("edit_asset", patch); out.textContent = "saved · " + res.fields.join(", ") + (res.reembedded ? " · re-embedded" : ""); setTimeout(renderLibrary, 800) }
+          catch (e) { out.textContent = e.message }
+        })
+        box.appendChild(row)
+      }
+    } catch (e) { box.textContent = e.message }
+  }
+
+  async function loadPending() {
+    try {
+      const r = await api("list_pending", {})
+      renderPending(r.pending, r.names)
+    } catch (e) { /* not unlocked */ }
+  }
+
+  function resolve(pendingId, action, chosen) {
+    api("resolve", { pending_id: pendingId, action, chosen })
+      .then(loadPending)
+      .catch((e) => alert(e.message))
+  }
+
+  function renderPending(rows, names) {
+    const host = $("pending")
+    host.innerHTML = ""
+    if (!rows || !rows.length) {
+      host.innerHTML = '<p class="hint">None open.</p>'
+      return
+    }
+    names = names || {}
+    for (const row of rows) {
+      const rec = row.raw_record || {}
+      const card = document.createElement("div")
+      card.className = "pending-card"
+
+      const who = document.createElement("div")
+      who.className = "who"
+      who.textContent = rec.full_name || "(no name)"
+      const tag = document.createElement("span")
+      tag.className = "hint"
+      tag.textContent = "  · " + (row.cluster_key || "")
+      who.appendChild(tag)
+      card.appendChild(who)
+
+      const incoming = document.createElement("div")
+      incoming.className = "hint"
+      incoming.style.marginTop = "4px"
+      incoming.textContent = "incoming: " + [rec.primary_email, rec.linkedin_url].filter(Boolean).join(" · ")
+      card.appendChild(incoming)
+
+      for (const cid of (row.candidates || [])) {
+        const line = document.createElement("div")
+        line.className = "cand"
+        const b = document.createElement("button")
+        b.className = "ghost mini"
+        b.textContent = "merge →"
+        b.addEventListener("click", () => resolve(row.id, "merge", cid))
+        line.appendChild(b)
+        const nm = document.createElement("span")
+        nm.textContent = names[cid] || cid
+        line.appendChild(nm)
+        card.appendChild(line)
+      }
+
+      const actions = document.createElement("div")
+      actions.style.marginTop = "10px"
+      actions.style.display = "flex"
+      actions.style.gap = "8px"
+      const bNew = document.createElement("button")
+      bNew.className = "ghost mini"
+      bNew.textContent = "create new"
+      bNew.addEventListener("click", () => resolve(row.id, "create_new"))
+      const bNot = document.createElement("button")
+      bNot.className = "ghost mini"
+      bNot.textContent = "not now"
+      bNot.addEventListener("click", () => resolve(row.id, "not_now"))
+      actions.appendChild(bNew)
+      actions.appendChild(bNot)
+      card.appendChild(actions)
+
+      host.appendChild(card)
+    }
+  }
+
+  // ---- §3.4 disposal surface (the output half) ----
+  let SUGS = [], SELID = null
+
+  function setNav(active) {
+    for (const id of ["navAdd", "navDispose", "navLookup", "navInitiatives", "navTasks"]) $(id).classList.toggle("active", id === active)
+    $("addView").classList.toggle("hidden", active !== "navAdd")
+    $("disposeView").classList.toggle("hidden", active !== "navDispose")
+    $("lookupView").classList.toggle("hidden", active !== "navLookup")
+    $("initiativesView").classList.toggle("hidden", active !== "navInitiatives")
+    $("tasksView").classList.toggle("hidden", active !== "navTasks")
+    document.body.classList.toggle("wide", active === "navDispose")
+  }
+  function showAdd() { setNav("navAdd") }
+  function showDispose() { setNav("navDispose"); loadSuggestions() }
+  function showLookup() { setNav("navLookup"); $("rm_q").focus() }
+  function showInitiatives() { setNav("navInitiatives"); $("i_intent").focus() }
+  function showTasks() { setNav("navTasks"); loadTasks() }
+
+  // ---- reverse-match (Day 90): resolve a pasted name/email/linkedin/org against the spine ----
+  async function reverseMatch() {
+    const q = $("rm_q").value.trim(), email = $("rm_email").value.trim()
+    const linkedin_url = $("rm_linkedin").value.trim(), org = $("rm_org").value.trim()
+    const host = $("rm_results"); host.innerHTML = ""
+    if (!q && !email && !linkedin_url && !org) { show($("rm_out"), "Enter a name, email, LinkedIn URL, or org.", false); return }
+    try {
+      const r = await api("reverse_match", { q, email, linkedin_url, org })
+      const ms = r.matches || []
+      if (!ms.length) { show($("rm_out"), "No match. Nothing known yet — add them under Add.", true); return }
+      const ambiguous = ms.some(m => m.is_ambiguous)
+      show($("rm_out"), ms.length + (ms.length === 1 ? " match" : " matches")
+        + (ambiguous ? " · name-only — confirm which one" : ""), true)
+      const basisLabel = { primary_email: "email", emails_overlap: "email", linkedin_url: "LinkedIn", org_member: "at org", name: "name" }
+      for (const m of ms) {
+        const item = document.createElement("div"); item.className = "search-hit"
+        if (m.person_id) addProfileBtn(item, m.person_id)
+        const nm = document.createElement("div"); nm.className = "sh-name"
+        nm.textContent = m.full_name + (m.is_ambiguous ? "  ·  ?" : "")
+        const bits = [basisLabel[m.match_basis] || m.match_basis, m.current_org, m.primary_email, m.location].filter(Boolean)
+        item.appendChild(nm)
+        const meta = document.createElement("div"); meta.className = "sh-meta"; meta.textContent = bits.join(" · ")
+        item.appendChild(meta)
+        // Step C (Day 91): explicit user_event calibration signal on the lookup.
+        // accepted = the match was useful; rejected = not a match. Buttons stop
+        // propagation so they don't trigger the row-click (navigation only).
+        const acts = document.createElement("div")
+        acts.style.cssText = "margin-top:6px;display:flex;gap:8px"
+        const mkBtn = (label, action) => {
+          const b = document.createElement("button"); b.className = "ghost mini"; b.textContent = label
+          b.addEventListener("click", async (ev) => {
+            ev.stopPropagation()
+            if (await rmDispose(m, action)) {
+              item.style.opacity = "0.5"
+              acts.querySelectorAll("button").forEach(x => x.disabled = true)
+              show($("rm_out"), (action === "accepted" ? "✓ recorded useful · " : "✗ recorded not-a-match · ") + m.full_name, true)
+            }
+          })
+          return b
+        }
+        acts.appendChild(mkBtn("✓ useful", "accepted"))
+        acts.appendChild(mkBtn("✗ not it", "rejected"))
+        item.appendChild(acts)
+        item.addEventListener("click", () => {
+          // reuse the Add-view note wiring: select this person, jump to Log-a-note
+          $("n_person").value = m.person_id
+          $("n_search").value = m.full_name
+          $("n_results").innerHTML = ""
+          showAdd()
+          $("n_text").focus()
+          show($("n_out"), "selected " + m.full_name + " · " + m.person_id, true)
+        })
+        host.appendChild(item)
+      }
+    } catch (e) { show($("rm_out"), e.message, false) }
+  }
+
+  // Step C (Day 91): record a model-free user_event disposition for a reverse-match
+  // result. The server creates+resolves an ephemeral surfacing inline (no claim_outcome,
+  // no pending-feed clutter) so the signal feeds the user_event calibration class.
+  async function rmDispose(m, action) {
+    try {
+      await api("reverse_match_dispose", {
+        action,
+        person_id: m.person_id || null,
+        match_basis: m.match_basis || null,
+        q: $("rm_q").value.trim() || null,
+        email: $("rm_email").value.trim() || null,
+        linkedin_url: $("rm_linkedin").value.trim() || null,
+        org: $("rm_org").value.trim() || null,
+      })
+      return true
+    } catch (e) { show($("rm_out"), e.message, false); return false }
+  }
+
+  async function loadSuggestions() {
+    try {
+      const r = await api("list_suggestions", {})
+      SUGS = r.suggestions || []
+      renderRail()
+      if (SELID && SUGS.some((s) => s.id === SELID)) selectSug(SELID)
+      else {
+        SELID = null
+        $("detail").innerHTML = '<p class="empty">Select a claim from the rail to dispose.</p>'
+        $("evidence").innerHTML = '<p class="empty">—</p>'
+      }
+    } catch (e) {
+      $("rail").innerHTML = '<p class="empty">' + e.message + '</p>'
+    }
+  }
+
+  // Person profile (Build 1, Day 114). Read-only detail assembled server-side by
+  // the get_person op. Opened from any search / reverse-match result row.
+  function esc(s) { return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])) }
+  function fmtDate(s) { return s ? String(s).slice(0, 10) : "" }
+
+  // Empirical band for an open hypothesis — the calibration STATE of its reference
+  // class, never the raw model confidence (A.1). Dot + label only (no confirm array:
+  // the profile signals "does this class have a track record", not a confirm rate).
+  function bandHTML(c) {
+    const labels = { grey: "uncalibrated", amber: "early estimate", green: "calibrated" }
+    const title = c.n_resolved < 5 ? "no calibration history for this type yet"
+      : "based on " + c.n_resolved + " resolved surfacings of this type"
+    return '<span class="pband ' + c.state + '" title="' + title + '"><span class="dot"></span>' +
+      '<span class="lbl">' + labels[c.state] + "</span></span>"
+  }
+
+  async function showProfile(personId) {
+    const modal = $("profileModal"), host = $("profileBody")
+    host.innerHTML = '<p class="hint">Loading…</p>'
+    modal.classList.add("show")
+    try {
+      const r = await api("get_person", { person_id: personId })
+      renderProfile(r.person)
+    } catch (e) {
+      host.innerHTML = '<p class="out err" style="display:block">' + esc(e.message) + "</p>"
+    }
+  }
+
+  function closeProfile() { $("profileModal").classList.remove("show") }
+
+  function renderProfile(p) {
+    const id = p.identity, host = $("profileBody")
+    let h = ""
+    h += '<h2 class="pname">' + esc(id.full_name) + (id.preferred_name ? ' <span class="side">“' + esc(id.preferred_name) + '”</span>' : "") + "</h2>"
+    const identBits = [id.primary_email, id.location, id.li_connected_on ? "connected " + fmtDate(id.li_connected_on) : null].filter(Boolean)
+    if (identBits.length) h += '<div class="pident">' + esc(identBits.join("  ·  ")) + "</div>"
+    if (id.linkedin_url) h += '<div class="pident"><a href="' + esc(id.linkedin_url) + '" target="_blank" rel="noopener" style="color:var(--gold)">LinkedIn ↗</a></div>'
+    if (id.background) h += '<div class="pbg">' + esc(id.background) + "</div>"
+    if ((id.tags || []).length) h += '<div class="pident">tags: ' + esc(id.tags.join(", ")) + "</div>"
+
+    // Affiliations — current only in the header; history folded behind a count.
+    // Day 116: each current org shows its context (industry · country · size) or a
+    // name-only flag, with an ◇ enrich affordance (the Day-107 payoff lever).
+    const cur = p.affiliations.current || []
+    h += '<div class="psec"><h3>Affiliations · current</h3>'
+    if (cur.length) {
+      for (const a of cur) {
+        const meta = [a.industry, a.country, a.size_band].filter(Boolean).join(" · ")
+        h += '<div class="prow"><span class="lead">' + esc(a.org || "(org)") + "</span>" +
+          (a.role_title ? ' — <span class="side">' + esc(a.role_title) + "</span>" : "") +
+          (meta ? ' <span class="side">[' + esc(meta) + "]</span>"
+                : ' <span class="side" style="color:var(--reject)">[name-only]</span>') +
+          ' <button class="ghost mini enrich-btn" data-org="' + esc(a.org || "") + '">◇ enrich</button></div>'
+      }
+    } else {
+      h += '<p class="hint">No current affiliation. <button class="ghost mini enrich-btn" data-org="">◇ set current org</button></p>'
+    }
+    h += '<div id="enrichSlot" class="inline-edit"></div></div>'
+
+    // Drivers / needs — both-halves current from the views; no raw confidence.
+    const dv = p.drivers || [], nd = p.needs || []
+    if (dv.length || nd.length) {
+      h += '<div class="psec"><h3>Drivers &amp; needs</h3>'
+      for (const d of dv) h += '<div class="prow"><span class="side">drive</span> ' + esc(d.description) + "</div>"
+      for (const n of nd) h += '<div class="prow"><span class="side">need' + (n.org ? " · " + esc(n.org) : "") + '</span> ' + esc(n.description) + "</div>"
+      h += "</div>"
+    }
+
+    // Open hypotheses — claim + empirical band (never the model number).
+    const hy = p.hypotheses || []
+    if (hy.length) {
+      h += '<div class="psec"><h3>Open hypotheses <span class="n">· ' + hy.length + "</span></h3>"
+      for (const x of hy) {
+        h += '<div class="phyp"><span class="hclaim">' + esc(x.claim) +
+          (x.fit_flag ? ' <span class="side">[' + esc(x.fit_flag) + "]</span>" : "") + "</span>" + bandHTML(x.calibration) + "</div>"
+      }
+      h += "</div>"
+    }
+
+    // Recent interactions — newest first, capped server-side; total shown.
+    const it = p.interactions || { total: 0, recent: [] }
+    if ((it.recent || []).length) {
+      h += '<div class="psec"><h3>Recent interactions <span class="n">· showing ' + it.recent.length + " of " + it.total + "</span></h3>"
+      for (const i of it.recent) {
+        const dirLbl = i.direction === "out" ? "→ sent" : "← received"
+        const hdr = [dirLbl, i.channel, fmtDate(i.occurred_at)].filter(Boolean).join("  ·  ")
+        h += '<div class="pint"><div class="ihdr"><span class="idir">' + esc(dirLbl) + "</span>" +
+          (i.channel || i.occurred_at ? "  ·  " + esc([i.channel, fmtDate(i.occurred_at)].filter(Boolean).join("  ·  ")) : "") + "</div>" +
+          (i.subject ? '<div class="ihdr">' + esc(i.subject) + "</div>" : "") +
+          '<div class="ibody">' + esc(i.body || "") + "</div></div>"
+      }
+      h += "</div>"
+    } else if (it.total === 0) {
+      h += '<div class="psec"><h3>Recent interactions</h3><p class="hint">No recorded interactions.</p></div>'
+    }
+
+    host.innerHTML = h
+    // Day 116: wire the ◇ enrich affordances (org-context enrichment form).
+    for (const b of host.querySelectorAll(".enrich-btn")) {
+      b.addEventListener("click", () => openEnrichForm(id.id, b.getAttribute("data-org") || ""))
+    }
+  }
+
+  // Day 116: org-context enrichment form (the Day-107 payoff lever — industry/country/
+  // size_band move hypothesis quality). Sets org context Clause-C (never clobbers) and
+  // ensures the person's current affiliation. country is ISO-2 (DK/US/…); industry and
+  // size_band are free text (the resonator reads them as context).
+  function openEnrichForm(personId, prefillOrg) {
+    const slot = $("enrichSlot"); if (!slot) return
+    slot.innerHTML = ""
+    const mk = (label, ph, val) => {
+      const wrap = document.createElement("div"); wrap.style.marginTop = "6px"
+      const l = document.createElement("label"); l.textContent = label; l.style.fontSize = "11px"; wrap.appendChild(l)
+      const i = document.createElement("input"); i.type = "text"; i.placeholder = ph; if (val) i.value = val; wrap.appendChild(i)
+      slot.appendChild(wrap); return i
+    }
+    const org = mk("Org name", "exact current employer", prefillOrg)
+    const role = mk("Role (optional)", "e.g. VP Engineering")
+    const ind = mk("Industry", "e.g. Aerospace & defense (free text)")
+    const ctry = mk("Country", "ISO-2, e.g. DK")
+    const size = mk("Size band", "e.g. large (10,000+)  ·  free text")
+    const out = document.createElement("div"); out.className = "out"; out.style.marginTop = "8px"
+    const save = mkBtn("Save org context", "btn-accept", async () => {
+      const orgName = org.value.trim(); if (!orgName) { show(out, "Org name required", false); return }
+      try {
+        const r = await api("enrich_org", {
+          person_id: personId, org_name: orgName,
+          role_title: role.value.trim() || null,
+          industry: ind.value.trim() || null,
+          country: ctry.value.trim() || null,
+          size_band: size.value.trim() || null,
+        })
+        const bits = [
+          r.org_matched ? "org matched" : "org created",
+          r.size_band_filled ? "size set" : null,
+          "affiliation: " + r.affiliation,
+        ].filter(Boolean).join(" · ")
+        show(out, "Saved — " + bits + ". Refreshing…", true)
+        setTimeout(() => showProfile(personId), 600)   // re-read so the profile reflects it
+      } catch (e) { show(out, e.message, false) }
+    })
+    save.style.marginTop = "10px"; slot.appendChild(save); slot.appendChild(out)
+    org.focus()
+  }
+
+  // A compact "◉ profile" affordance appended to a result row. Its click must not
+  // trigger the row's own select/navigate handler (buttons stopPropagation).
+  function addProfileBtn(item, personId) {
+    const b = document.createElement("button")
+    b.className = "ghost mini sh-profile"; b.textContent = "◉ profile"
+    b.addEventListener("click", (ev) => { ev.stopPropagation(); showProfile(personId) })
+    item.insertBefore(b, item.firstChild)
+  }
+
+  // Confidence chip (A.1) — calibration STATE + confirmation array, never the raw number.
+  function chipHTML(c, mini) {
+    const labels = { grey: "uncalibrated", amber: "early estimate", green: "calibrated" }
+    const title = c.n_resolved < 5
+      ? "first surfacings of this type — no calibration history yet"
+      : "based on " + c.n_resolved + " surfacings of this type"
+    let arr = ""
+    if (c.state !== "grey") {
+      let s = ""
+      for (let i = 0; i < 10; i++) s += i < c.filled ? "◆" : "◇"
+      arr = '<span class="arr">' + s + "</span>"
+    }
+    const qual = c.qualifier ? '<span class="qual">' + c.qualifier + " confirmed</span>" : ""
+    return '<span class="chip ' + c.state + (mini ? " mini-chip" : "") + '" title="' + title + '">' +
+      '<span class="dot"></span><span class="state">' + labels[c.state] + "</span>" + arr + qual + "</span>"
+  }
+
+  function mkRailItem(s) {
+    const item = document.createElement("div")
+    item.className = "rail-item" + (s.id === SELID ? " sel" : "")
+    const cl = document.createElement("div")
+    cl.className = "rclaim"
+    cl.textContent = s.claim || "(no claim)"
+    item.appendChild(cl)
+    const meta = document.createElement("div")
+    meta.className = "rmeta"
+    const sp = document.createElement("span"); sp.textContent = s.subject.type
+    meta.appendChild(sp)
+    if (s.asset) { const g = document.createElement("span"); g.className = "rasset"; g.textContent = "◈"; g.title = "asset: " + s.asset.title; meta.appendChild(g) }
+    meta.insertAdjacentHTML("beforeend", chipHTML(s.calibration, true))
+    item.appendChild(meta)
+    item.addEventListener("click", () => selectSug(s.id))
+    return item
+  }
+
+  // Review-cadence nudge (Day 102) — mirror the daily-brief banner at the surface
+  // where disposition actually happens. Computed from the full pending set (SUGS),
+  // independent of the ◈ asset filter, so it always reflects the true queue + TTL.
+  function renderReviewBanner() {
+    const el = $("reviewBanner"); if (!el) return
+    const total = SUGS.length
+    if (total === 0) { el.className = "review-banner hidden"; return }
+    const expiring = SUGS.filter((s) => s.expires_at && new Date(s.expires_at).getTime() <= Date.now() + 24 * 3600 * 1000).length
+    if (expiring > 0) {
+      el.className = "review-banner urgent"
+      el.innerHTML = '⏳ <span class="rb-strong">' + expiring + ' expire' + (expiring === 1 ? 's' : '') +
+        ' within 24h</span> — review today or ' + (expiring === 1 ? 'it is' : 'they are') +
+        ' lost. · ' + total + ' awaiting your decision.'
+    } else {
+      el.className = "review-banner"
+      el.innerHTML = '📋 <span class="rb-strong">' + total + '</span> awaiting your decision.'
+    }
+  }
+
+  function renderRail() {
+    renderReviewBanner()
+    const assetOnly = $("assetOnly") && $("assetOnly").checked
+    const view = assetOnly ? SUGS.filter((s) => s.asset) : SUGS
+    $("sugCount").textContent = assetOnly ? "· " + view.length + " / " + SUGS.length : "· " + SUGS.length
+    const host = $("rail")
+    host.innerHTML = ""
+    if (!view.length) { host.innerHTML = '<p class="empty">' + (assetOnly ? "No asset-linked proposals pending." : "Nothing pending. The feed is clear.") + '</p>'; return }
+    // Day 91: group cross-subject near-duplicates by cluster_key (person + org of
+    // the same event, joined by a current affiliation). A cluster of ≥2 collapses
+    // under one header; click to expand. Singletons render as before. Server order
+    // (confidence desc) preserved; a cluster anchors at its first member.
+    const order = [], groups = {}
+    for (const s of view) {
+      const k = s.cluster_key
+      if (k && groups[k]) { groups[k].push(s); continue }
+      if (k) { groups[k] = [s]; order.push({ type: "cluster", key: k }) }
+      else order.push({ type: "single", s })
+    }
+    for (const o of order) {
+      if (o.type === "single") { host.appendChild(mkRailItem(o.s)); continue }
+      const members = groups[o.key]
+      if (members.length === 1) { host.appendChild(mkRailItem(members[0])); continue }
+      const hdr = document.createElement("div")
+      hdr.className = "rail-item"
+      hdr.style.background = "rgba(198,165,83,.05)"
+      hdr.innerHTML = '<div class="rclaim">⛓ ' + members.length + ' grouped · same event &amp; org</div>'
+        + '<div class="rmeta">' + members.map(m => m.subject.type).join(" + ") + ' · click to expand</div>'
+      const wrap = document.createElement("div"); wrap.style.display = "none"
+      for (const m of members) { const it = mkRailItem(m); it.style.paddingLeft = "28px"; wrap.appendChild(it) }
+      hdr.addEventListener("click", () => { wrap.style.display = wrap.style.display === "none" ? "" : "none" })
+      host.appendChild(hdr); host.appendChild(wrap)
+    }
+  }
+
+  function mkBtn(label, cls, fn) {
+    const b = document.createElement("button"); b.className = cls; b.textContent = label
+    b.addEventListener("click", fn); return b
+  }
+
+  function selectSug(id) {
+    SELID = id
+    renderRail()
+    const s = SUGS.find((x) => x.id === id)
+    if (!s) return
+    const d = $("detail"); d.innerHTML = ""
+    const subj = document.createElement("div"); subj.className = "subject"
+    subj.textContent = s.subject.type + " · " + s.subject.name; d.appendChild(subj)
+    const chip = document.createElement("div"); chip.style.margin = "12px 0 4px"
+    chip.innerHTML = chipHTML(s.calibration, false); d.appendChild(chip)
+    const claim = document.createElement("div"); claim.className = "claim"
+    claim.textContent = s.claim || "(no claim)"
+    if (s.amended) { const m = document.createElement("span"); m.className = "amended-tag"; m.textContent = " · amended"; claim.appendChild(m) }
+    d.appendChild(claim)
+    if (s.rationale) { const r = document.createElement("div"); r.className = "rationale"; r.textContent = s.rationale; d.appendChild(r) }
+    if (s.suggested_action) { const a = document.createElement("div"); a.className = "sugact"; a.textContent = "→ " + s.suggested_action; d.appendChild(a) }
+    if (s.asset) {
+      const ab = document.createElement("div"); ab.className = "asset-bring"
+      const lead = document.createElement("span"); lead.className = "ab-lead"; lead.textContent = "◈ bring"; ab.appendChild(lead)
+      const wrap = document.createElement("span")
+      const t = document.createElement("span"); t.className = "ab-title"; t.textContent = s.asset.title; wrap.appendChild(t)
+      if (s.asset.kind) { const k = document.createElement("span"); k.className = "ab-kind"; k.textContent = " · " + s.asset.kind.replace(/_/g, " "); wrap.appendChild(k) }
+      ab.appendChild(wrap); d.appendChild(ab)
+    }
+    const acts = document.createElement("div"); acts.className = "acts"
+    acts.appendChild(mkBtn("Accept", "btn-accept", () => dispose(id, "accepted")))
+    // Day 115 Build 2 Slice B: "Done" = already acted and it was TRUE → a hit, not a
+    // reject. Counts as confirmed for calibration; spawns no task (already done).
+    acts.appendChild(mkBtn("Done ✓", "btn-accept", () => dispose(id, "done")))
+    // Slice A: Reject opens a reason picker — the code routes the signal (only
+    // 'wrong' debits calibration; the rest route to eligibility/threshold/matching).
+    acts.appendChild(mkBtn("Reject…", "btn-reject", () => openReject(id)))
+    acts.appendChild(mkBtn("Amend", "btn-edit", () => openEdit(id, s.claim)))
+    acts.appendChild(mkBtn("Snooze", "btn-snooze", () => openSnooze(id)))
+    d.appendChild(acts)
+    const slot = document.createElement("div"); slot.id = "inlineSlot"; slot.className = "inline-edit"; d.appendChild(slot)
+    const out = document.createElement("div"); out.className = "out"; out.id = "disp_out"; d.appendChild(out)
+    renderEvidence(s)
+  }
+
+  function renderEvidence(s) {
+    const host = $("evidence"); host.innerHTML = ""
+    if (!s.evidence || !s.evidence.length) { host.innerHTML = '<p class="empty">No linked evidence.</p>'; return }
+    for (const e of s.evidence) {
+      const it = document.createElement("div"); it.className = "ev-item"
+      if (e.url) {
+        const a = document.createElement("a"); a.href = e.url; a.target = "_blank"; a.rel = "noopener"
+        a.textContent = e.title || e.url; it.appendChild(a)
+      } else { const t = document.createElement("div"); t.textContent = e.title || "(untitled)"; it.appendChild(t) }
+      if (e.summary) { const sm = document.createElement("div"); sm.className = "esum"; sm.textContent = e.summary; it.appendChild(sm) }
+      const k = document.createElement("div"); k.className = "ekind"
+      k.textContent = [e.kind, (e.occurred_at || "").slice(0, 10)].filter(Boolean).join(" · "); it.appendChild(k)
+      host.appendChild(it)
+    }
+  }
+
+  function openEdit(id, claim) {
+    const slot = $("inlineSlot"); slot.innerHTML = ""
+    const lab = document.createElement("label"); lab.textContent = "Corrected claim"; slot.appendChild(lab)
+    const ta = document.createElement("textarea"); ta.value = claim || ""; slot.appendChild(ta)
+    // Amend is NON-resolving: it records the correction and keeps the card
+    // pending so you still choose Accept / Reject / Snooze.
+    slot.appendChild(mkBtn("Save amendment", "btn-edit", () => amend(id, ta)))
+  }
+
+  async function amend(id, ta) {
+    const v = ta.value.trim(); if (!v) return
+    try {
+      await api("dispose", { suggestion_id: id, action: "amended", delta: { claim: v }, comment: "claim amended via console" })
+      const s = SUGS.find((x) => x.id === id)
+      if (s) { s.claim = v; s.amended = true }   // overlay locally; card stays pending
+      selectSug(id)                              // re-render with corrected claim + actions
+      const o = $("disp_out"); if (o) show(o, "Amendment saved — now Accept, Reject, or Snooze.", true)
+    } catch (e) {
+      const o = $("disp_out"); if (o) show(o, e.message, false); else alert(e.message)
+    }
+  }
+
+  // Day 115 Build 2 Slice A: reject reason picker. The code rides in delta; the DB
+  // gates calibration (only 'wrong'/absent debits the curve). 'wrong_person' also
+  // offers the reattribute branch (Slice C) — correct the subject, keep the inference.
+  function openReject(id) {
+    const slot = $("inlineSlot"); slot.innerHTML = ""
+    const lab = document.createElement("label"); lab.textContent = "Why reject? (this routes the signal)"; slot.appendChild(lab)
+    const row = document.createElement("div"); row.className = "acts"; row.style.marginTop = "8px"
+    const codes = [
+      ["Wrong", "wrong", "false / bad inference → calibration (debits the curve)"],
+      ["Not my network", "not_my_network", "true, but no connection to act → eligibility gate (NOT calibration)"],
+      ["Not worth it", "not_worth_it", "true, actionable, low value → surfacing threshold (NOT calibration)"],
+      ["Wrong person", "wrong_person", "true, but wrong subject → matching (NOT calibration)"],
+    ]
+    for (const [label, code, tip] of codes) {
+      const b = mkBtn(label, "btn-reject", () => dispose(id, "rejected", { reason_code: code }))
+      b.title = tip
+      row.appendChild(b)
+    }
+    slot.appendChild(row)
+    // Slice C: on wrong_person, offer to reattribute to the correct subject.
+    const rea = mkBtn("↪ Reattribute to correct person", "btn-edit", () => openReattribute(id))
+    rea.style.marginTop = "10px"; slot.appendChild(rea)
+  }
+
+  // Day 115 Build 2 Slice C: reattribute picker. Search for the correct subject; picking
+  // one preserves the inference on that single person (anti-fan-out) and dispositions the
+  // original as wrong_person (matching signal, no calibration debit).
+  function openReattribute(id) {
+    const slot = $("inlineSlot"); slot.innerHTML = ""
+    const lab = document.createElement("label"); lab.textContent = "Reattribute to — search the correct person"; slot.appendChild(lab)
+    const inp = document.createElement("input"); inp.type = "text"; inp.placeholder = "name (min 2 chars)"; slot.appendChild(inp)
+    const results = document.createElement("div"); results.className = "search-results"; results.style.marginTop = "8px"; slot.appendChild(results)
+    let t = null
+    inp.addEventListener("input", () => {
+      clearTimeout(t)
+      t = setTimeout(async () => {
+        const q = inp.value.trim(); results.innerHTML = ""
+        if (q.length < 2) return
+        try {
+          const r = await api("search_people", { q })
+          for (const p of (r.people || [])) {
+            const row = document.createElement("div"); row.className = "cand"
+            const name = p.full_name + (p.org ? " · " + p.org : "") + (p.location ? " · " + p.location : "")
+            const b = mkBtn("↪ " + name, "btn-edit", () => reattribute(id, p.id, p.full_name))
+            b.style.textAlign = "left"; row.appendChild(b); results.appendChild(row)
+          }
+          if (!(r.people || []).length) results.innerHTML = '<p class="empty">No match.</p>'
+        } catch (e) { results.innerHTML = '<p class="empty">' + e.message + '</p>' }
+      }, 250)
+    })
+  }
+
+  async function reattribute(id, newPersonId, newName) {
+    try {
+      const r = await api("reattribute", { suggestion_id: id, new_person_id: newPersonId })
+      SUGS = SUGS.filter((s) => s.id !== id); SELID = null
+      const d = $("detail"); d.innerHTML = ""
+      const msg = document.createElement("p"); msg.className = "empty"
+      msg.textContent = "Reattributed to " + newName + " · new suggestion " + (r.new_suggestion_id || "") +
+        ". Original recorded wrong_person (matching signal, no calibration debit). Select another."
+      d.appendChild(msg)
+      $("evidence").innerHTML = '<p class="empty">—</p>'
+      renderRail()
+    } catch (e) {
+      const o = $("disp_out"); if (o) show(o, e.message, false); else alert(e.message)
+    }
+  }
+
+  function openSnooze(id) {
+    const slot = $("inlineSlot"); slot.innerHTML = ""
+    const lab = document.createElement("label"); lab.textContent = "Snooze until"; slot.appendChild(lab)
+    const inp = document.createElement("input"); inp.type = "datetime-local"; slot.appendChild(inp)
+    slot.appendChild(mkBtn("Confirm snooze", "btn-snooze", () => {
+      if (!inp.value) return
+      dispose(id, "snoozed", { snooze_until: new Date(inp.value).toISOString() })
+    }))
+  }
+
+  async function dispose(id, action, extra) {
+    try {
+      const r = await api("dispose", Object.assign({ suggestion_id: id, action }, extra || {}))
+      SUGS = SUGS.filter((s) => s.id !== id); SELID = null
+      const d = $("detail"); d.innerHTML = ""
+      const msg = document.createElement("p"); msg.className = "empty"
+      msg.textContent = "Disposed (" + action + ") · feedback_event " + (r.feedback_event_id || "") + ". Select another."
+      d.appendChild(msg)
+      // Echo an edit's correction so the operator sees it was captured. The claim
+      // is recorded as a tracked correction (feedback delta), NOT an in-place
+      // overwrite of the source hypothesis — hence "Recorded correction", not "updated".
+      if (action === "edited" && extra && extra.delta && extra.delta.claim) {
+        const ed = document.createElement("p"); ed.className = "empty"
+        ed.textContent = "Recorded correction: " + extra.delta.claim
+        d.appendChild(ed)
+      }
+      $("evidence").innerHTML = '<p class="empty">—</p>'
+      renderRail()
+    } catch (e) {
+      const o = $("disp_out"); if (o) show(o, e.message, false); else alert(e.message)
+    }
+  }
+
+  // ---- Initiatives (Day 109): operator-sovereign top-down dispatch ----
+  // Two steps mirror create_initiative's modes: dry-run reads the fit distribution
+  // (so the floor is chosen FROM DATA, never guessed), then a live dispatch at that floor.
+  let I_DRY = null   // last dry-run result, so dispatch can sanity-check intent unchanged
+
+  async function initiativeDryRun() {
+    const intent = $("i_intent").value.trim()
+    if (!intent) { show($("i_dry_out"), "Intent is required.", false); return }
+    const limit = parseInt($("i_limit").value, 10) || 100
+    show($("i_dry_out"), "embedding + ranking…", true)
+    $("i_dist").classList.add("hidden"); $("i_cands").innerHTML = ""
+    try {
+      const r = await api("create_initiative", { intent, dry_run: true, limit })
+      I_DRY = { intent }
+      show($("i_dry_out"), r.candidate_count + " candidates ranked. Pick a floor from the distribution below, then dispatch.", true)
+      renderDistribution(r)
+      // Reveal the dispatch panel and pre-fill a sensible floor (the median) as a starting point.
+      $("i_dispatchPanel").classList.remove("hidden")
+      if (r.distribution && !$("i_floor").value) $("i_floor").value = Number(r.distribution.median).toFixed(2)
+    } catch (e) { show($("i_dry_out"), e.message, false); I_DRY = null }
+  }
+
+  function renderDistribution(r) {
+    const dist = $("i_dist"); dist.innerHTML = ""; dist.classList.remove("hidden")
+    if (r.distribution) {
+      const d = r.distribution
+      const line = document.createElement("div"); line.className = "hint"
+      line.style.cssText = "font-size:12px;color:var(--ink-dim);margin-bottom:8px"
+      const f = (x) => Number(x).toFixed(3)
+      line.textContent = "fit (best_sim) over " + r.candidate_count + ":  min " + f(d.min) +
+        " · p25 " + f(d.p25) + " · median " + f(d.median) + " · p75 " + f(d.p75) + " · max " + f(d.max)
+      dist.appendChild(line)
+    }
+    const host = $("i_cands"); host.innerHTML = ""
+    if (!r.candidates || !r.candidates.length) { host.innerHTML = '<p class="hint">No candidates.</p>'; return }
+    for (const c of r.candidates) {
+      const item = document.createElement("div"); item.className = "search-hit"
+      const nm = document.createElement("div"); nm.className = "sh-name"
+      nm.textContent = Number(c.best_sim).toFixed(3) + "  " + (c.full_name || "(no name)")
+      item.appendChild(nm)
+      const meta = document.createElement("div"); meta.className = "sh-meta"
+      meta.textContent = "[" + (c.top_kind || "?") + "] " + (c.top_signal || "")
+      item.appendChild(meta)
+      host.appendChild(item)
+    }
+  }
+
+  async function initiativeDispatch() {
+    const intent = $("i_intent").value.trim()
+    const title = $("i_title").value.trim()
+    const floor = parseFloat($("i_floor").value)
+    const weak = parseFloat($("i_weak").value)
+    const cap = parseInt($("i_cap").value, 10) || 8
+    if (!intent) { show($("i_live_out"), "Intent is required.", false); return }
+    if (!title) { show($("i_live_out"), "Title is required for a live dispatch.", false); return }
+    if (!(floor > 0)) { show($("i_live_out"), "Floor must be > 0 — run a dry-run first and pick it from the distribution.", false); return }
+    if (!I_DRY || I_DRY.intent !== intent) {
+      if (!confirm("You haven't dry-run this exact intent. Dispatch anyway?")) return
+    }
+    if (!confirm("Dispatch \"" + title + "\" live to up to " + cap + " people at floor " + floor + "?\n\nThis writes the audit chain (owes verify + anchor at close).")) return
+    show($("i_live_out"), "dispatching — composing + routing per candidate, this can take ~" + cap * 8 + "s…", true)
+    $("i_results").innerHTML = ""
+    try {
+      const payload = { intent, title, floor, cap, dry_run: false }
+      if (weak > 0) payload.weak_below = weak
+      const r = await api("create_initiative", payload)
+      show($("i_live_out"), "trigger " + r.trigger_id + " · emitted " + r.emitted + " · routed " + r.routed +
+        " · weak_fit " + r.weak_fit + (r.is_active ? "" : " · INACTIVE (agent-proposed)"), true)
+      renderInitiativeResults(r)
+    } catch (e) { show($("i_live_out"), e.message, false) }
+  }
+
+  function renderInitiativeResults(r) {
+    const host = $("i_results"); host.innerHTML = ""
+    const sugs = r.suggestions || []
+    const hdr = document.createElement("div"); hdr.className = "hint"
+    hdr.style.cssText = "font-size:12px;margin-bottom:8px"
+    hdr.textContent = sugs.length + " suggestion" + (sugs.length === 1 ? "" : "s") + " now in your pending feed:"
+    host.appendChild(hdr)
+    for (const s of sugs) {
+      const item = document.createElement("div"); item.className = "search-hit"
+      const nm = document.createElement("div"); nm.className = "sh-name"
+      nm.textContent = (s.fit_flag === "weak_fit" ? "◌ weak · " : "● ") + (s.status || "")
+      item.appendChild(nm)
+      const meta = document.createElement("div"); meta.className = "sh-meta"
+      meta.textContent = s.suggested_action || ""
+      item.appendChild(meta)
+      host.appendChild(item)
+    }
+    // Surface any per-candidate skips (compose/route failures) so nothing is silently dropped.
+    const skipped = (r.results || []).filter((x) => x.skipped || x.routed === false)
+    if (skipped.length) {
+      const s = document.createElement("div"); s.className = "hint"; s.style.cssText = "margin-top:8px;color:var(--reject)"
+      s.textContent = skipped.length + " not routed: " + skipped.map((x) => (x.full_name || "?") + " (" + (x.skipped || ("router " + x.router_status)) + ")").join(", ")
+      host.appendChild(s)
+    }
+  }
+
+  // ---- Tasks (Day 110): surface + close the work spawned by accepted propositions ----
+  // Build 2's list_tasks/update_task ops had no UI. A status change (complete/abandon/stall)
+  // writes a chained feedback_event (the grade-3 outcome signal); a pure action-text amend writes none.
+  async function loadTasks() {
+    const host = $("tasksList"); host.textContent = "loading…"
+    const all = $("tasksAll") && $("tasksAll").checked
+    try {
+      const payload = all ? { status: ["open", "stalled", "completed", "abandoned"] } : {}
+      const r = await api("list_tasks", payload)
+      renderTasks(r.tasks || [])
+    } catch (e) { host.textContent = e.message }
+  }
+
+  const TASK_STATUS_COLOR = { open: "var(--gold)", stalled: "var(--ink-dim)", completed: "var(--green)", abandoned: "var(--reject)" }
+
+  function renderTasks(tasks) {
+    const host = $("tasksList"); host.innerHTML = ""
+    if (!tasks.length) { host.innerHTML = '<p class="hint">No tasks. Accept or edit a suggestion in Dispose to spawn one.</p>'; return }
+    for (const t of tasks) {
+      const card = document.createElement("div"); card.className = "pending-card"
+
+      const head = document.createElement("div"); head.className = "who"
+      head.textContent = t.current_action || "(no action)"
+      card.appendChild(head)
+
+      const subject = [t.person_name, t.org_name].filter(Boolean).join(" · ")
+      const meta = document.createElement("div"); meta.className = "hint"; meta.style.marginTop = "5px"
+      const age = t.created_at ? Math.max(0, Math.round((Date.now() - new Date(t.created_at).getTime()) / 86400000)) : null
+      const pill = '<span style="color:' + (TASK_STATUS_COLOR[t.status] || "var(--ink-dim)") + ';font-weight:600">● ' + t.status + '</span>'
+      meta.innerHTML = pill + (subject ? " · " + esc(subject) : "")
+        + (t.created_from ? " · from " + esc(t.created_from) : "")
+        + (age !== null ? " · " + (age === 0 ? "today" : age + "d ago") : "")
+      card.appendChild(meta)
+
+      // Action row — only for non-terminal tasks (open / stalled).
+      if (t.status === "open" || t.status === "stalled") {
+        const acts = document.createElement("div"); acts.className = "acts"
+        acts.appendChild(mkBtn("Complete", "btn-accept", () => updateTaskStatus(t.id, "completed")))
+        acts.appendChild(mkBtn("Abandon", "btn-reject", () => updateTaskStatus(t.id, "abandoned")))
+        acts.appendChild(mkBtn(t.status === "stalled" ? "Reopen" : "Stall", "btn-snooze",
+          () => updateTaskStatus(t.id, t.status === "stalled" ? "open" : "stalled")))
+        acts.appendChild(mkBtn("Edit action", "btn-edit", () => openTaskEdit(card, t)))
+        card.appendChild(acts)
+      }
+      const out = document.createElement("div"); out.className = "out"; out.style.marginTop = "10px"; card.appendChild(out)
+      card._out = out
+      host.appendChild(card)
+    }
+  }
+
+  function esc(s) { const d = document.createElement("div"); d.textContent = s == null ? "" : s; return d.innerHTML }
+
+  async function updateTaskStatus(id, status) {
+    try {
+      const r = await api("update_task", { task_id: id, status, comment: "via console tasks tab" })
+      // r.feedback_event_id present on a real status change (the outcome signal).
+      loadTasks()
+    } catch (e) { alert(e.message) }
+  }
+
+  function openTaskEdit(card, t) {
+    const slot = document.createElement("div"); slot.className = "inline-edit"
+    const lab = document.createElement("label"); lab.textContent = "Current action"; slot.appendChild(lab)
+    const ta = document.createElement("textarea"); ta.value = t.current_action || ""; slot.appendChild(ta)
+    slot.appendChild(mkBtn("Save action", "btn-edit", async () => {
+      const v = ta.value.trim(); if (!v || v === t.current_action) { slot.remove(); return }
+      try { await api("update_task", { task_id: t.id, current_action: v }); loadTasks() }
+      catch (e) { show(card._out, e.message, false) }
+    }))
+    card.appendChild(slot)
+  }
+
+  $("unlockBtn").addEventListener("click", unlock)
+  $("token").addEventListener("keydown", (e) => { if (e.key === "Enter") unlock() })
+  $("addPersonBtn").addEventListener("click", addPerson)
+  $("addNoteBtn").addEventListener("click", addNote)
+  $("n_search").addEventListener("input", onPersonSearch)
+  $("addOrgBtn").addEventListener("click", addOrg)
+  $("addAssetBtn").addEventListener("click", addAsset)
+  $("libRefreshBtn").addEventListener("click", renderLibrary)
+  $("a_kind").addEventListener("change", () => {
+    $("a_kind_other").style.display = $("a_kind").value === "__other" ? "block" : "none"
+  })
+  $("refreshBtn").addEventListener("click", loadPending)
+  $("navAdd").addEventListener("click", showAdd)
+  $("navDispose").addEventListener("click", showDispose)
+  $("navLookup").addEventListener("click", showLookup)
+  $("navInitiatives").addEventListener("click", showInitiatives)
+  $("i_dryBtn").addEventListener("click", initiativeDryRun)
+  $("i_liveBtn").addEventListener("click", initiativeDispatch)
+  $("navTasks").addEventListener("click", showTasks)
+  $("tasksRefresh").addEventListener("click", loadTasks)
+  $("tasksAll").addEventListener("change", loadTasks)
+  $("rm_btn").addEventListener("click", reverseMatch)
+  for (const id of ["rm_q", "rm_email", "rm_linkedin", "rm_org"]) {
+    $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") reverseMatch() })
+  }
+  $("dispRefresh").addEventListener("click", loadSuggestions)
+  $("assetOnly").addEventListener("change", renderRail)
+  $("profileClose").addEventListener("click", closeProfile)
+  $("profileModal").addEventListener("click", (e) => { if (e.target === $("profileModal")) closeProfile() })
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("profileModal").classList.contains("show")) closeProfile() })
+
+  if (TOKEN) {
+    api("list_pending", {}).then((r) => { enterApp(); renderPending(r.pending, r.names) }).catch(() => {})
+  }
+</script>
+</body>
+</html>
