@@ -378,7 +378,7 @@
       <h2>Tasks <button class="ghost mini" id="tasksRefresh" style="margin-left:10px">refresh</button>
         <label class="asset-filter" style="float:right" title="Include completed/abandoned"><input type="checkbox" id="tasksAll"> show resolved</label>
       </h2>
-      <p class="hint">What you committed to when you accepted a proposition. Accepting or editing a suggestion spawns a task here; <strong>Complete</strong> / <strong>Abandon</strong> is the outcome signal the learning loop grades against. <strong>Stall</strong> parks it without resolving. Editing the action text alone records no signal.</p>
+      <p class="hint">What you committed to when you accepted a proposition. Accepting or editing a suggestion spawns a task here; <strong>Complete</strong> / <strong>Abandon</strong> is the outcome signal the learning loop grades against. <strong>Stall</strong> parks it without resolving. Editing the action text alone records no signal. Tasks not tied to a proposition sit under <strong>Unassigned</strong> — use the per-task picker to file one into a workspace (or leave it standalone).</p>
       <div id="tasksList" style="margin-top:12px"></div>
     </div>
     </div><!-- /tasksView -->
@@ -1342,51 +1342,108 @@
   // ---- Tasks (Day 110): surface + close the work spawned by accepted propositions ----
   // Build 2's list_tasks/update_task ops had no UI. A status change (complete/abandon/stall)
   // writes a chained feedback_event (the grade-3 outcome signal); a pure action-text amend writes none.
+  let TASK_PROPS = []   // Day 120: proposition summaries, cached for the per-task assign picker
+
   async function loadTasks() {
     const host = $("tasksList"); host.textContent = "loading…"
     const all = $("tasksAll") && $("tasksAll").checked
     try {
       const payload = all ? { status: ["open", "stalled", "completed", "abandoned"] } : {}
-      const r = await api("list_tasks", payload)
+      // Pull the proposition list alongside tasks so each card's assign picker is populated.
+      const [r, pr] = await Promise.all([
+        api("list_tasks", payload),
+        api("list_propositions", {}).catch(() => ({ propositions: [] })),
+      ])
+      TASK_PROPS = pr.propositions || []
       renderTasks(r.tasks || [])
     } catch (e) { host.textContent = e.message }
   }
 
   const TASK_STATUS_COLOR = { open: "var(--gold)", stalled: "var(--ink-dim)", completed: "var(--green)", abandoned: "var(--reject)" }
 
+  // Day 120: group by proposition membership. Standalone tasks (proposition_id null) are
+  // legitimate one-off work, but were invisible/unattachable — surface them as "Unassigned"
+  // with a per-card picker to file them into a proposition (or leave them standalone).
   function renderTasks(tasks) {
     const host = $("tasksList"); host.innerHTML = ""
     if (!tasks.length) { host.innerHTML = '<p class="hint">No tasks. Accept or edit a suggestion in Dispose to spawn one.</p>'; return }
-    for (const t of tasks) {
-      const card = document.createElement("div"); card.className = "pending-card"
-
-      const head = document.createElement("div"); head.className = "who"
-      head.textContent = t.current_action || "(no action)"
-      card.appendChild(head)
-
-      const subject = [t.person_name, t.org_name].filter(Boolean).join(" · ")
-      const meta = document.createElement("div"); meta.className = "hint"; meta.style.marginTop = "5px"
-      const age = t.created_at ? Math.max(0, Math.round((Date.now() - new Date(t.created_at).getTime()) / 86400000)) : null
-      const pill = '<span style="color:' + (TASK_STATUS_COLOR[t.status] || "var(--ink-dim)") + ';font-weight:600">● ' + t.status + '</span>'
-      meta.innerHTML = pill + (subject ? " · " + esc(subject) : "")
-        + (t.created_from ? " · from " + esc(t.created_from) : "")
-        + (age !== null ? " · " + (age === 0 ? "today" : age + "d ago") : "")
-      card.appendChild(meta)
-
-      // Action row — only for non-terminal tasks (open / stalled).
-      if (t.status === "open" || t.status === "stalled") {
-        const acts = document.createElement("div"); acts.className = "acts"
-        acts.appendChild(mkBtn("Complete", "btn-accept", () => updateTaskStatus(t.id, "completed")))
-        acts.appendChild(mkBtn("Abandon", "btn-reject", () => updateTaskStatus(t.id, "abandoned")))
-        acts.appendChild(mkBtn(t.status === "stalled" ? "Reopen" : "Stall", "btn-snooze",
-          () => updateTaskStatus(t.id, t.status === "stalled" ? "open" : "stalled")))
-        acts.appendChild(mkBtn("Edit action", "btn-edit", () => openTaskEdit(card, t)))
-        card.appendChild(acts)
-      }
-      const out = document.createElement("div"); out.className = "out"; out.style.marginTop = "10px"; card.appendChild(out)
-      card._out = out
-      host.appendChild(card)
+    const unassigned = tasks.filter((t) => !t.proposition_id)
+    const assigned = tasks.filter((t) => t.proposition_id)
+    if (unassigned.length) {
+      host.appendChild(taskGroupHeader("Unassigned · " + unassigned.length,
+        "Standalone tasks, not tied to any proposition. Legitimate for one-off relationship maintenance — or file one into a workspace with the picker."))
+      for (const t of unassigned) host.appendChild(taskCard(t))
     }
+    if (assigned.length) {
+      host.appendChild(taskGroupHeader("In a proposition · " + assigned.length, null))
+      for (const t of assigned) host.appendChild(taskCard(t))
+    }
+  }
+
+  function taskGroupHeader(text, hint) {
+    const wrap = document.createElement("div")
+    const h = document.createElement("div"); h.className = "hint"
+    h.style.cssText = "text-transform:uppercase;letter-spacing:.12em;color:var(--ink-faint);margin:18px 0 8px;border-bottom:1px solid var(--line);padding-bottom:4px"
+    h.textContent = text; wrap.appendChild(h)
+    if (hint) { const p = document.createElement("div"); p.className = "hint"; p.style.marginBottom = "8px"; p.textContent = hint; wrap.appendChild(p) }
+    return wrap
+  }
+
+  function taskCard(t) {
+    const card = document.createElement("div"); card.className = "pending-card"
+
+    const head = document.createElement("div"); head.className = "who"
+    head.textContent = t.current_action || "(no action)"
+    card.appendChild(head)
+
+    const subject = [t.person_name, t.org_name].filter(Boolean).join(" · ")
+    const meta = document.createElement("div"); meta.className = "hint"; meta.style.marginTop = "5px"
+    const age = t.created_at ? Math.max(0, Math.round((Date.now() - new Date(t.created_at).getTime()) / 86400000)) : null
+    const pill = '<span style="color:' + (TASK_STATUS_COLOR[t.status] || "var(--ink-dim)") + ';font-weight:600">● ' + t.status + '</span>'
+    meta.innerHTML = pill + (subject ? " · " + esc(subject) : "")
+      + (t.proposition_name ? ' · <span style="color:var(--gold)">◆ ' + esc(t.proposition_name) + "</span>" : "")
+      + (t.created_from ? " · from " + esc(t.created_from) : "")
+      + (age !== null ? " · " + (age === 0 ? "today" : age + "d ago") : "")
+    card.appendChild(meta)
+
+    // Action row — only for non-terminal tasks (open / stalled).
+    if (t.status === "open" || t.status === "stalled") {
+      const acts = document.createElement("div"); acts.className = "acts"
+      acts.appendChild(mkBtn("Complete", "btn-accept", () => updateTaskStatus(t.id, "completed")))
+      acts.appendChild(mkBtn("Abandon", "btn-reject", () => updateTaskStatus(t.id, "abandoned")))
+      acts.appendChild(mkBtn(t.status === "stalled" ? "Reopen" : "Stall", "btn-snooze",
+        () => updateTaskStatus(t.id, t.status === "stalled" ? "open" : "stalled")))
+      acts.appendChild(mkBtn("Edit action", "btn-edit", () => openTaskEdit(card, t)))
+      acts.appendChild(taskPropPicker(t))
+      card.appendChild(acts)
+    }
+    const out = document.createElement("div"); out.className = "out"; out.style.marginTop = "10px"; card.appendChild(out)
+    card._out = out
+    return card
+  }
+
+  // Assign / reassign / detach: a <select> of propositions (blank = standalone), same idiom as
+  // the horizon picker on the Propositions tab. Changing it calls set_task_proposition.
+  function taskPropPicker(t) {
+    const sel = document.createElement("select")
+    sel.style.cssText = "font-size:12px;padding:3px 6px"
+    sel.title = "File this task into a proposition (or leave it standalone)"
+    const none = document.createElement("option"); none.value = ""; none.textContent = "— no proposition —"
+    if (!t.proposition_id) none.selected = true
+    sel.appendChild(none)
+    let hasCurrent = false
+    for (const p of TASK_PROPS) {
+      const o = document.createElement("option"); o.value = p.id; o.textContent = p.title
+      if (p.id === t.proposition_id) { o.selected = true; hasCurrent = true }
+      sel.appendChild(o)
+    }
+    // If the task's proposition isn't in the list (e.g. archived off the summary), keep it selectable.
+    if (t.proposition_id && !hasCurrent) {
+      const o = document.createElement("option"); o.value = t.proposition_id
+      o.textContent = (t.proposition_name || "(current proposition)"); o.selected = true; sel.appendChild(o)
+    }
+    sel.addEventListener("change", () => setTaskProposition(t.id, sel.value || null))
+    return sel
   }
 
   function esc(s) { const d = document.createElement("div"); d.textContent = s == null ? "" : s; return d.innerHTML }
@@ -1396,6 +1453,13 @@
       const r = await api("update_task", { task_id: id, status, comment: "via console tasks tab" })
       // r.feedback_event_id present on a real status change (the outcome signal).
       loadTasks()
+    } catch (e) { alert(e.message) }
+  }
+
+  async function setTaskProposition(taskId, propId) {
+    try {
+      await api("set_task_proposition", { task_id: taskId, proposition_id: propId })
+      loadTasks()   // re-render so the task hops between Unassigned and its proposition group
     } catch (e) { alert(e.message) }
   }
 
