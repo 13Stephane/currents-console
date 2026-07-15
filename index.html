@@ -67,7 +67,7 @@
   .mini { margin: 0; padding: 4px 10px; font-size: 11px; }
 
   /* §3.4 disposal surface — view nav + split-reader (Layout C) */
-  .nav { display: flex; gap: 8px; margin-bottom: 26px; }
+  .nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 26px; }
   .nav button { margin-top: 0; background: transparent; color: var(--ink-dim); border-color: var(--line); }
   .nav button.active { border-color: var(--gold); color: var(--ink); }
   body.wide .wrap { max-width: 1180px; }
@@ -145,6 +145,28 @@
   .chip.mini-chip { font-size: 8.5px; gap: 6px; }
   .chip.mini-chip .dot { width: 6px; height: 6px; }
   .empty { color: var(--ink-faint); font-size: 13px; font-family: "IBM Plex Mono", monospace; padding: 18px 16px; }
+  /* Fact/inference grammar (eye slice) — one rule: round/square = Spine (fact, ink),
+     diamond = Soft (inference, gold). Marks come from one source (MARK/markSpan). */
+  .mk { font-family: "IBM Plex Mono", monospace; flex: none; }
+  .mk-person, .mk-org { color: var(--ink-dim); }
+  .mk-asset, .mk-inf { color: var(--gold); }
+  /* SVG glyph marks — the mockup's visual language. Color set by mk-* (currentColor). */
+  .gl { width: 15px; height: 15px; display: inline-block; vertical-align: -2px; flex: none; }
+  .rmeta .gl, .side .gl { width: 12px; height: 12px; vertical-align: -1px; }
+  .pname .gl { width: 21px; height: 21px; vertical-align: -3px; }
+  .phyp .gl { margin-top: 1px; }
+  .prow .gl, .rf-opt .gl { vertical-align: -2px; }
+  /* Header sounding motif (identity) + the contact-profile facts/inferences split. */
+  .head-mark { width: 26px; height: 26px; display: inline-block; vertical-align: -6px; margin-right: 11px; color: var(--ink-dim); }
+  #profileModal .pcard { max-width: 780px; }
+  .hub-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 30px; margin-top: 8px; align-items: start; }
+  .hub-col { min-width: 0; }
+  .hub-cols .col-head { font-family: "IBM Plex Mono", monospace; font-size: 10px; letter-spacing: .16em;
+    text-transform: uppercase; padding: 0 0 8px; margin: 6px 0 0; border-bottom: 1px solid var(--line); }
+  .hub-cols .fact-head { color: var(--ink-dim); }
+  .hub-cols .soft-head { color: var(--gold); }
+  .hub-col .psec { border-top: none; margin-top: 16px; padding-top: 0; }
+  @media (max-width: 700px) { #profileModal .pcard { max-width: 100%; } .hub-cols { grid-template-columns: 1fr; gap: 0; } }
   /* Person profile modal (Build 1, Day 114) — a read-only detail panel reachable
      from any search / reverse-match result. Confidence never rendered raw: open
      hypotheses carry the empirical band, not the model number. */
@@ -182,9 +204,45 @@
 </style>
 </head>
 <body>
+<!-- Mark glyphs (the visual language): person = ringed disc, org = enclosure,
+     asset = document, inference = diamond whose fill is calibration. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="g-person" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="9.3" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".6"/>
+    <circle cx="12" cy="12" r="4.6" fill="currentColor"/>
+  </symbol>
+  <symbol id="g-org" viewBox="0 0 24 24">
+    <rect x="4.5" y="6.5" width="15" height="13" rx="1" fill="currentColor"/>
+    <rect x="7.4" y="10" width="3" height="3" fill="var(--bg)"/>
+    <rect x="13.6" y="10" width="3" height="3" fill="var(--bg)"/>
+    <rect x="10.4" y="14.6" width="3.2" height="4.9" fill="var(--bg)"/>
+  </symbol>
+  <symbol id="g-asset" viewBox="0 0 24 24">
+    <path d="M6 4.5h8.5L18.5 8.5V19.5H6Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+    <path d="M14.5 4.5V8.5H18.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+    <line x1="8.6" y1="12" x2="15.4" y2="12" stroke="currentColor" stroke-width="1.4"/>
+    <line x1="8.6" y1="15" x2="15.4" y2="15" stroke="currentColor" stroke-width="1.4"/>
+  </symbol>
+  <symbol id="g-inf-0" viewBox="0 0 24 24">
+    <rect x="6.9" y="6.9" width="10.2" height="10.2" transform="rotate(45 12 12)" fill="none" stroke="currentColor" stroke-width="1.7"/>
+  </symbol>
+  <symbol id="g-inf-1" viewBox="0 0 24 24">
+    <rect x="6.9" y="6.9" width="10.2" height="10.2" transform="rotate(45 12 12)" fill="none" stroke="currentColor" stroke-width="1.7"/>
+    <path d="M12 12 L19.2 12 L12 19.2 L4.8 12 Z" fill="currentColor"/>
+  </symbol>
+  <symbol id="g-inf-2" viewBox="0 0 24 24">
+    <rect x="6.9" y="6.9" width="10.2" height="10.2" transform="rotate(45 12 12)" fill="currentColor" stroke="currentColor" stroke-width="1.7"/>
+  </symbol>
+  <symbol id="g-sounding" viewBox="0 0 100 100">
+    <circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" stroke-width="2" opacity=".22"/>
+    <circle cx="50" cy="50" r="32" fill="none" stroke="currentColor" stroke-width="2" opacity=".38"/>
+    <circle cx="50" cy="50" r="19" fill="none" stroke="var(--gold)" stroke-width="2.4"/>
+    <circle cx="50" cy="50" r="7.5" fill="currentColor" opacity=".5"/>
+  </symbol>
+</defs></svg>
 <div class="wrap">
   <div class="head">
-    <h1>Currents · the <em>operator</em> console</h1>
+    <h1><svg class="head-mark"><use href="#g-sounding"/></svg>Currents · the <em>operator</em> console</h1>
     <span class="sub">system proposes · human disposes</span>
   </div>
 
@@ -203,11 +261,12 @@
   <div id="app" class="hidden">
     <div class="nav">
       <button id="navAdd" class="active">Add</button>
-      <button id="navDispose">Dispose</button>
+      <button id="navDispose">Theses</button>
       <button id="navLookup">Lookup</button>
       <button id="navInitiatives">Initiatives</button>
       <button id="navPropositions">Propositions</button>
       <button id="navTasks">Tasks</button>
+      <button id="navNews">News</button>
     </div>
 
     <div id="addView">
@@ -314,7 +373,7 @@
           <div class="rail" id="rail"></div>
         </div>
         <div class="col detail" id="detail">
-          <p class="empty">Select a claim from the rail to dispose.</p>
+          <p class="empty">Select a thesis to dispose.</p>
         </div>
         <div class="col">
           <div class="col-h">Why · provenance</div>
@@ -383,6 +442,21 @@
     </div>
     </div><!-- /tasksView -->
 
+    <div id="newsView" class="hidden">
+    <div class="panel">
+      <h2>News <button class="ghost mini" id="newsRefresh" style="margin-left:10px">refresh</button></h2>
+      <p class="hint">The news-fit gate. Every incoming story is scored against your positioning <em>before</em> the resonator turns it into theses. <strong>Held</strong> = below the fit floor, suppressed (no theses generated). <strong>Validate</strong> promotes a held story to the resonator queue (overrides the model); <strong>Park</strong> mutes it. Eligible / Validated already flow — <strong>Hold</strong> pulls one back. This is the review half of the gate: the model proposes, you dispose. No calibration signal is written here.</p>
+      <div class="nav" id="newsStateNav" style="margin-bottom:14px">
+        <button data-state="held" class="active">Held</button>
+        <button data-state="eligible">Eligible</button>
+        <button data-state="validated">Validated</button>
+        <button data-state="parked">Parked</button>
+        <button data-state="all">All</button>
+      </div>
+      <div id="newsList"></div>
+    </div>
+    </div><!-- /newsView -->
+
     <div id="propositionsView" class="hidden">
     <div class="panel">
       <h2>Propositions <button class="ghost mini" id="propRefresh" style="margin-left:10px">refresh</button></h2>
@@ -433,6 +507,17 @@
     el.textContent = msg
     el.className = "out " + (ok ? "ok" : "err")
   }
+
+  // Fact/inference grammar (eye slice). The single place a mark is chosen, so a restyle
+  // is one edit. Round/square = Spine fact; diamond = Soft inference; fill = calibration.
+  const GLYPH = { person: "g-person", org: "g-org", asset: "g-asset", inf_hollow: "g-inf-0", inf_half: "g-inf-1", inf_full: "g-inf-2" }
+  function markSpan(key, cls) { return '<svg class="gl ' + cls + '"><use href="#' + GLYPH[key] + '"/></svg>' }
+  function subjectMark(type) {
+    const org = type === "org" || type === "organization"
+    return markSpan(org ? "org" : "person", org ? "mk-org" : "mk-person")
+  }
+  // Inference diamond by calibration state: grey -> hollow, amber -> half, green -> full.
+  function infMark(state) { return markSpan(state === "green" ? "inf_full" : state === "amber" ? "inf_half" : "inf_hollow", "mk-inf") }
 
   async function api(op, payload) {
     const res = await fetch(API, {
@@ -695,13 +780,14 @@
   let SUGS = [], SELID = null
 
   function setNav(active) {
-    for (const id of ["navAdd", "navDispose", "navLookup", "navInitiatives", "navPropositions", "navTasks"]) $(id).classList.toggle("active", id === active)
+    for (const id of ["navAdd", "navDispose", "navLookup", "navInitiatives", "navPropositions", "navTasks", "navNews"]) $(id).classList.toggle("active", id === active)
     $("addView").classList.toggle("hidden", active !== "navAdd")
     $("disposeView").classList.toggle("hidden", active !== "navDispose")
     $("lookupView").classList.toggle("hidden", active !== "navLookup")
     $("initiativesView").classList.toggle("hidden", active !== "navInitiatives")
     $("propositionsView").classList.toggle("hidden", active !== "navPropositions")
     $("tasksView").classList.toggle("hidden", active !== "navTasks")
+    $("newsView").classList.toggle("hidden", active !== "navNews")
     document.body.classList.toggle("wide", active === "navDispose")
   }
   function showAdd() { setNav("navAdd") }
@@ -710,6 +796,7 @@
   function showInitiatives() { setNav("navInitiatives"); $("i_intent").focus() }
   function showPropositions() { setNav("navPropositions"); loadPropositions() }
   function showTasks() { setNav("navTasks"); loadTasks() }
+  function showNews() { setNav("navNews"); loadNews() }
 
   // ---- reverse-match (Day 90): resolve a pasted name/email/linkedin/org against the spine ----
   async function reverseMatch() {
@@ -794,7 +881,7 @@
       if (SELID && SUGS.some((s) => s.id === SELID)) selectSug(SELID)
       else {
         SELID = null
-        $("detail").innerHTML = '<p class="empty">Select a claim from the rail to dispose.</p>'
+        $("detail").innerHTML = '<p class="empty">Select a thesis to dispose.</p>'
         $("evidence").innerHTML = '<p class="empty">—</p>'
       }
     } catch (e) {
@@ -835,12 +922,16 @@
   function renderProfile(p) {
     const id = p.identity, host = $("profileBody")
     let h = ""
-    h += '<h2 class="pname">' + esc(id.full_name) + (id.preferred_name ? ' <span class="side">“' + esc(id.preferred_name) + '”</span>' : "") + "</h2>"
+    h += '<h2 class="pname">' + markSpan("person", "mk-person") + " " + esc(id.full_name) + (id.preferred_name ? ' <span class="side">“' + esc(id.preferred_name) + '”</span>' : "") + "</h2>"
     const identBits = [id.primary_email, id.location, id.li_connected_on ? "connected " + fmtDate(id.li_connected_on) : null].filter(Boolean)
     if (identBits.length) h += '<div class="pident">' + esc(identBits.join("  ·  ")) + "</div>"
     if (id.linkedin_url) h += '<div class="pident"><a href="' + esc(id.linkedin_url) + '" target="_blank" rel="noopener" style="color:var(--gold)">LinkedIn ↗</a></div>'
     if (id.background) h += '<div class="pbg">' + esc(id.background) + "</div>"
     if ((id.tags || []).length) h += '<div class="pident">tags: ' + esc(id.tags.join(", ")) + "</div>"
+
+    // Two-column split (middle option): facts (Spine) left, inferences (Soft) right,
+    // the console's own doctrine made visible. Interactions stay full width below.
+    h += '<div class="hub-cols"><div class="hub-col"><p class="col-head fact-head">Facts · Spine</p>'
 
     // Affiliations — current only in the header; history folded behind a count.
     // Day 116: each current org shows its context (industry · country · size) or a
@@ -861,6 +952,25 @@
     }
     h += '<div id="enrichSlot" class="inline-edit"></div></div>'
 
+    // Notes (fact) — person_raw_inputs, written via "Log a note", now read back (E3).
+    const notes = p.notes || []
+    if (notes.length) {
+      h += '<div class="psec"><h3>Notes <span class="n">· ' + notes.length + "</span></h3>"
+      for (const n of notes) h += '<div class="prow"><span class="side">' + fmtDate(n.created_at) + "</span> " + esc(n.text) + "</div>"
+      h += "</div>"
+    }
+
+    // Assets in play (fact, ◈) — authored content the resonator cited to this person.
+    const assets = p.assets || []
+    if (assets.length) {
+      h += '<div class="psec"><h3>Assets in play <span class="n">· ' + assets.length + "</span></h3>"
+      for (const a of assets) h += '<div class="prow">' + markSpan("asset", "mk-asset") + " " + esc(a.title) +
+        (a.kind ? ' <span class="side">' + esc(String(a.kind).replace(/_/g, " ")) + "</span>" : "") + "</div>"
+      h += "</div>"
+    }
+    // close facts column, open inferences column
+    h += '</div><div class="hub-col"><p class="col-head soft-head">Inferences · Soft</p>'
+
     // Drivers / needs — both-halves current from the views; no raw confidence.
     const dv = p.drivers || [], nd = p.needs || []
     if (dv.length || nd.length) {
@@ -875,11 +985,37 @@
     if (hy.length) {
       h += '<div class="psec"><h3>Open hypotheses <span class="n">· ' + hy.length + "</span></h3>"
       for (const x of hy) {
-        h += '<div class="phyp"><span class="hclaim">' + esc(x.claim) +
+        h += '<div class="phyp">' + infMark(x.calibration.state) + '<span class="hclaim">' + esc(x.claim) +
           (x.fit_flag ? ' <span class="side">[' + esc(x.fit_flag) + "]</span>" : "") + "</span>" + bandHTML(x.calibration) + "</div>"
       }
       h += "</div>"
     }
+
+    // Involved in (inference, E3) — propositions the person is a stakeholder on (◇)
+    // and their open tasks (●). Both columns existed; the profile never read them.
+    const inv = p.involvements || [], tsk = p.tasks || []
+    if (inv.length || tsk.length) {
+      h += '<div class="psec"><h3>Involved in</h3>'
+      for (const v of inv) h += '<div class="prow">' + markSpan("inf_hollow", "mk-inf") + " " + esc(v.proposition || "(proposition)") +
+        ' <span class="side">' + esc([v.role, v.stage].filter(Boolean).join(" · ")) + "</span></div>"
+      for (const t of tsk) h += '<div class="prow"><span class="mk" style="color:var(--gold)">●</span> ' + esc(t.action) +
+        ' <span class="side">' + esc([t.status, t.horizon, t.proposition].filter(Boolean).join(" · ")) + "</span></div>"
+      h += "</div>"
+    }
+
+    // Connections — confirmed edges (◉ person, a spine fact) and inferred connection
+    // soundings (◇, soft). The write side of these (current #4) is a later slice.
+    const conn = p.connections || { confirmed: [], inferred: [] }
+    if ((conn.confirmed || []).length || (conn.inferred || []).length) {
+      h += '<div class="psec"><h3>Connections</h3>'
+      for (const c of (conn.confirmed || [])) h += '<div class="prow">' + markSpan("person", "mk-person") + " " + esc(c.name || "(person)") +
+        ' <span class="side">' + esc(c.kind || "relation") + (c.confirmed ? " · confirmed" : "") + "</span></div>"
+      for (const c of (conn.inferred || [])) h += '<div class="prow">' + markSpan("inf_hollow", "mk-inf") + " " + esc(c.name || "(person)") +
+        ' <span class="side">thesis' + (c.why ? " · " + esc(c.why) : "") + "</span></div>"
+      h += "</div>"
+    }
+    // close inferences column + the two-column wrapper
+    h += "</div></div>"
 
     // Recent interactions — newest first, capped server-side; total shown.
     const it = p.interactions || { total: 0, recent: [] }
@@ -982,6 +1118,8 @@
     item.appendChild(cl)
     const meta = document.createElement("div")
     meta.className = "rmeta"
+    const mk = document.createElement("span"); mk.innerHTML = subjectMark(s.subject.type)
+    meta.appendChild(mk)
     const sp = document.createElement("span"); sp.textContent = s.subject.type
     meta.appendChild(sp)
     if (s.asset) { const g = document.createElement("span"); g.className = "rasset"; g.textContent = "◈"; g.title = "asset: " + s.asset.title; meta.appendChild(g) }
@@ -1050,6 +1188,38 @@
     b.addEventListener("click", fn); return b
   }
 
+  // The hand (currents #2): AI rewordings as soundings to dispose. Calls the reframe
+  // op (read + LLM, no write), renders each option with a ◇ inference mark; "Use"
+  // disposes the chosen wording into the real field via the caller's apply(text) fn.
+  async function openReframe(target, id, currentText, mount, apply) {
+    mount.innerHTML = '<p class="hint">Reframing…</p>'
+    let r
+    try { r = await api("reframe", { target, id, current_text: currentText || null }) }
+    catch (e) { mount.innerHTML = '<p class="out err" style="display:block">' + esc(e.message) + "</p>"; return }
+    mount.innerHTML = ""
+    const lab = document.createElement("div"); lab.className = "hint"
+    lab.style.cssText = "text-transform:uppercase;letter-spacing:.1em;color:var(--gold);margin-bottom:8px"
+    lab.textContent = "rewordings, as theses · use one to dispose it in"
+    mount.appendChild(lab)
+    for (const o of r.options) {
+      const row = document.createElement("div")
+      row.style.cssText = "display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)"
+      const g = document.createElement("span"); g.style.marginTop = "3px"; g.innerHTML = markSpan("inf_hollow", "mk-inf"); row.appendChild(g)
+      const txt = document.createElement("div"); txt.style.flex = "1"
+      const t = document.createElement("div"); t.style.fontStyle = "italic"; t.textContent = o.text; txt.appendChild(t)
+      if (o.why) { const w = document.createElement("div"); w.className = "hint"; w.style.marginTop = "2px"; w.textContent = o.why; txt.appendChild(w) }
+      row.appendChild(txt)
+      const use = mkBtn("Use", "btn-accept", async () => {
+        use.disabled = true; use.textContent = "…"
+        try { await apply(o.text); mount.innerHTML = '<p class="hint">Disposed into the ' + (target === "proposition" ? "thesis" : "action") + ".</p>" }
+        catch (e) { use.disabled = false; use.textContent = "Use"; alert(e.message) }
+      })
+      use.style.cssText = "margin-top:0;padding:5px 12px;font-size:11px"
+      row.appendChild(use)
+      mount.appendChild(row)
+    }
+  }
+
   function selectSug(id) {
     SELID = id
     renderRail()
@@ -1075,15 +1245,22 @@
       ab.appendChild(wrap); d.appendChild(ab)
     }
     const acts = document.createElement("div"); acts.className = "acts"
+    // Order: positive commits first (Accept, Done), then non-destructive edits
+    // (Amend the wording, Attach to the right person), then defer (Snooze), then the
+    // destructive action last (Reject) — reduces misclicks on the negative path.
     acts.appendChild(mkBtn("Accept", "btn-accept", () => dispose(id, "accepted")))
     // Day 115 Build 2 Slice B: "Done" = already acted and it was TRUE → a hit, not a
     // reject. Counts as confirmed for calibration; spawns no task (already done).
     acts.appendChild(mkBtn("Done ✓", "btn-accept", () => dispose(id, "done")))
+    acts.appendChild(mkBtn("Amend", "btn-edit", () => openEdit(id, s.claim)))
+    // Attach-to-person (currents #4b): re-point this thesis at a person via the
+    // existing reattribute path (moves the inference to the person, closes the
+    // original as a matching correction). Surfaced directly, not only under reject.
+    acts.appendChild(mkBtn("↪ Attach to person", "btn-edit", () => openReattribute(id)))
+    acts.appendChild(mkBtn("Snooze", "btn-snooze", () => openSnooze(id)))
     // Slice A: Reject opens a reason picker — the code routes the signal (only
     // 'wrong' debits calibration; the rest route to eligibility/threshold/matching).
     acts.appendChild(mkBtn("Reject…", "btn-reject", () => openReject(id)))
-    acts.appendChild(mkBtn("Amend", "btn-edit", () => openEdit(id, s.claim)))
-    acts.appendChild(mkBtn("Snooze", "btn-snooze", () => openSnooze(id)))
     d.appendChild(acts)
     const slot = document.createElement("div"); slot.id = "inlineSlot"; slot.className = "inline-edit"; d.appendChild(slot)
     const out = document.createElement("div"); out.className = "out"; out.id = "disp_out"; d.appendChild(out)
@@ -1396,11 +1573,14 @@
     head.textContent = t.current_action || "(no action)"
     card.appendChild(head)
 
-    const subject = [t.person_name, t.org_name].filter(Boolean).join(" · ")
+    const subjBits = []
+    if (t.person_name) subjBits.push(markSpan("person", "mk-person") + " " + esc(t.person_name))
+    if (t.org_name) subjBits.push(markSpan("org", "mk-org") + " " + esc(t.org_name))
+    const subjectHTML = subjBits.join(" · ")
     const meta = document.createElement("div"); meta.className = "hint"; meta.style.marginTop = "5px"
     const age = t.created_at ? Math.max(0, Math.round((Date.now() - new Date(t.created_at).getTime()) / 86400000)) : null
     const pill = '<span style="color:' + (TASK_STATUS_COLOR[t.status] || "var(--ink-dim)") + ';font-weight:600">● ' + t.status + '</span>'
-    meta.innerHTML = pill + (subject ? " · " + esc(subject) : "")
+    meta.innerHTML = pill + (subjectHTML ? " · " + subjectHTML : "")
       + (t.proposition_name ? ' · <span style="color:var(--gold)">◆ ' + esc(t.proposition_name) + "</span>" : "")
       + (t.created_from ? " · from " + esc(t.created_from) : "")
       + (age !== null ? " · " + (age === 0 ? "today" : age + "d ago") : "")
@@ -1414,6 +1594,11 @@
       acts.appendChild(mkBtn(t.status === "stalled" ? "Reopen" : "Stall", "btn-snooze",
         () => updateTaskStatus(t.id, t.status === "stalled" ? "open" : "stalled")))
       acts.appendChild(mkBtn("Edit action", "btn-edit", () => openTaskEdit(card, t)))
+      acts.appendChild(mkBtn("✧ Reframe", "btn-edit", () => {
+        let slot = card.querySelector(".reframe-slot")
+        if (!slot) { slot = document.createElement("div"); slot.className = "reframe-slot inline-edit"; card.appendChild(slot) }
+        openReframe("task", t.id, t.current_action, slot, async (text) => { await api("update_task", { task_id: t.id, current_action: text }); loadTasks() })
+      }))
       acts.appendChild(taskPropPicker(t))
       card.appendChild(acts)
     }
@@ -1493,7 +1678,7 @@
     if (!props.length) { host.innerHTML = '<p class="hint">No propositions yet. Create one above, then fold theses in from Dispose.</p>'; return }
     for (const p of props) {
       const card = document.createElement("div"); card.className = "pending-card"; card.style.cursor = "pointer"
-      const head = document.createElement("div"); head.className = "who"; head.textContent = p.title
+      const head = document.createElement("div"); head.className = "who"; head.innerHTML = markSpan("inf_hollow", "mk-inf") + " " + esc(p.title)
       card.appendChild(head)
       const meta = document.createElement("div"); meta.className = "hint"; meta.style.marginTop = "5px"
       meta.innerHTML = '<span style="color:var(--gold)">' + esc(p.product || p.kind) + "</span> · " + esc(p.status)
@@ -1539,6 +1724,14 @@
       const ts = document.createElement("div"); ts.style.cssText = "font-style:italic;color:var(--ink-dim);margin:4px 0 10px"
       ts.textContent = "“" + p.thesis_statement + "”"; host.appendChild(ts)
     }
+    // ✧ reframe the thesis (currents #2) — rewordings arrive as soundings to dispose in.
+    const rfSlot = document.createElement("div"); rfSlot.style.margin = "0 0 10px"
+    const rfBtn = mkBtn("✧ Reframe thesis", "btn-edit", () =>
+      openReframe("proposition", p.id, p.thesis_statement || p.title, rfSlot, async (text) => {
+        await api("update_proposition", { proposition_id: p.id, thesis_statement: text }); openProposition(p.id)
+      }))
+    rfBtn.style.marginTop = "0"
+    host.appendChild(rfBtn); host.appendChild(rfSlot)
 
     // lifecycle
     const life = document.createElement("div"); life.className = "acts"; life.style.marginBottom = "10px"
@@ -1779,6 +1972,70 @@
     $("a_kind_other").style.display = $("a_kind").value === "__other" ? "block" : "none"
   })
   $("refreshBtn").addEventListener("click", loadPending)
+  // ── News tab (news-fit gate review) ─────────────────────────────────────
+  let NEWS_STATE = "held"
+  const NEWS_STATE_COLOR = { held: "var(--ink-dim)", eligible: "var(--green)", validated: "var(--gold)", parked: "var(--reject)" }
+
+  async function loadNews() {
+    const host = $("newsList"); host.textContent = "loading…"
+    try {
+      const r = await api("list_news", { state: NEWS_STATE, limit: 100 })
+      renderNews(r.news || [])
+    } catch (e) { host.textContent = e.message }
+  }
+
+  function renderNews(items) {
+    const host = $("newsList"); host.innerHTML = ""
+    if (!items.length) { host.innerHTML = '<p class="hint">Nothing in this bucket.</p>'; return }
+    for (const it of items) host.appendChild(newsCard(it))
+  }
+
+  function newsCard(it) {
+    const card = document.createElement("div")
+    card.style.cssText = "border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:10px"
+
+    const head = document.createElement("div"); head.style.cssText = "display:flex;gap:10px;align-items:baseline;flex-wrap:wrap"
+    const score = document.createElement("span")
+    score.style.cssText = "font-variant-numeric:tabular-nums;color:var(--ink-dim)"
+    score.textContent = (it.fit_score == null ? "—" : Number(it.fit_score).toFixed(3))
+    const st = document.createElement("span"); st.textContent = it.fit_state
+    const col = NEWS_STATE_COLOR[it.fit_state] || "var(--ink-dim)"
+    st.style.cssText = "font-size:12px;padding:1px 8px;border:1px solid " + col + ";color:" + col + ";border-radius:10px"
+    const meta = document.createElement("span"); meta.style.cssText = "color:var(--ink-dim);font-size:12px"
+    meta.textContent = (it.source_kind || "news") + " · " + (it.observed_at || "").slice(0, 10) + (it.hypothesis_count ? " · " + it.hypothesis_count + " theses" : "")
+    head.append(score, st, meta)
+
+    const title = document.createElement("div"); title.style.cssText = "margin:6px 0 2px;font-weight:600"
+    if (it.url) { const a = document.createElement("a"); a.href = it.url; a.target = "_blank"; a.rel = "noopener"; a.style.color = "inherit"; a.textContent = it.title || "(untitled)"; title.appendChild(a) }
+    else title.textContent = it.title || "(untitled)"
+
+    const summary = document.createElement("div"); summary.style.cssText = "color:var(--ink-dim);font-size:13px;margin-bottom:8px"
+    summary.textContent = (it.summary || "").slice(0, 220)
+
+    const actions = document.createElement("div"); actions.style.cssText = "display:flex;gap:8px"
+    const mk = (label, action, cls) => { const b = document.createElement("button"); b.className = cls; b.textContent = label; b.onclick = () => disposeNews(it.event_id, action); return b }
+    if (it.fit_state === "held") actions.append(mk("Validate", "validate", "mini"), mk("Park", "park", "mini ghost"))
+    else if (it.fit_state === "parked") actions.append(mk("Validate", "validate", "mini"), mk("Hold", "hold", "mini ghost"))
+    else actions.append(mk("Hold", "hold", "mini ghost"), mk("Park", "park", "mini ghost"))  // eligible / validated
+
+    card.append(head, title, summary, actions)
+    return card
+  }
+
+  async function disposeNews(eventId, action) {
+    try { await api("news_dispose", { event_id: eventId, action }); loadNews() }
+    catch (e) { alert(e.message) }
+  }
+
+  function initNewsStateNav() {
+    const nav = $("newsStateNav"); if (!nav) return
+    nav.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+      NEWS_STATE = b.dataset.state
+      nav.querySelectorAll("button").forEach((x) => x.classList.toggle("active", x === b))
+      loadNews()
+    }))
+  }
+
   $("navAdd").addEventListener("click", showAdd)
   $("navDispose").addEventListener("click", showDispose)
   $("navLookup").addEventListener("click", showLookup)
@@ -1789,6 +2046,9 @@
   $("tasksRefresh").addEventListener("click", loadTasks)
   $("tasksAll").addEventListener("change", loadTasks)
   $("navPropositions").addEventListener("click", showPropositions)
+  $("navNews").addEventListener("click", showNews)
+  $("newsRefresh") && $("newsRefresh").addEventListener("click", loadNews)
+  initNewsStateNav()
   $("propRefresh").addEventListener("click", loadPropositions)
   $("p_createBtn").addEventListener("click", createProposition)
   $("composeClose").addEventListener("click", closeCompose)
