@@ -451,7 +451,7 @@
       <h2>Tasks <button class="ghost mini" id="tasksRefresh" style="margin-left:10px">refresh</button>
         <label class="asset-filter" style="float:right" title="Include completed/abandoned"><input type="checkbox" id="tasksAll"> show resolved</label>
       </h2>
-      <p class="hint">What you committed to when you accepted a proposition. Accepting or editing a suggestion spawns a task here; <strong>Complete</strong> / <strong>Abandon</strong> is the outcome signal the learning loop grades against. <strong>Stall</strong> parks it without resolving. Editing the action text alone records no signal. Tasks not tied to a proposition sit under <strong>Unassigned</strong> — use the per-task picker to file one into a workspace (or leave it standalone).</p>
+      <p class="hint">Your commitments — a task is spawned when you accept or edit a suggestion. <strong>Complete</strong> / <strong>Abandon</strong> is the outcome signal the loop grades against; <strong>Stall</strong> parks it. Unfiled tasks sit under <strong>Unassigned</strong>.</p>
       <div id="tasksList" style="margin-top:12px"></div>
     </div>
     </div><!-- /tasksView -->
@@ -867,16 +867,25 @@
 
   function finderPersonItem(p, precise) {
     const item = document.createElement("div"); item.className = "search-hit"
-    if (p.person_id) addProfileBtn(item, p.person_id)
     const nm = document.createElement("div"); nm.className = "sh-name"
     nm.innerHTML = subjectMark("person") + " " + esc(p.full_name) + (p.is_ambiguous ? '  <span class="side">· ?</span>' : "")
     item.appendChild(nm)
     const bits = [BASIS_LABEL[p.match_basis] || p.match_basis, p.org, p.email, p.location].filter(Boolean)
     const meta = document.createElement("div"); meta.className = "sh-meta"; meta.textContent = bits.join(" · "); item.appendChild(meta)
+    const acts = document.createElement("div"); acts.style.cssText = "margin-top:6px;display:flex;gap:8px;flex-wrap:wrap"
+    // Feedback #4: clicking a result should show the FULL person. The row opens the
+    // profile (Day-122 read-back: notes, tasks, involvements, connections, drivers/needs).
+    // A secondary "+ note" keeps the log-a-note flow (the panel is on this same surface).
+    const noteBtn = mkBtn("+ note", "ghost mini", (ev) => {
+      ev.stopPropagation()
+      $("n_person").value = p.person_id; $("n_search").value = p.full_name; $("n_results").innerHTML = ""
+      $("n_text").scrollIntoView({ behavior: "smooth", block: "center" }); $("n_text").focus()
+      show($("n_out"), "selected " + p.full_name + " · " + p.person_id + " — log a note below", true)
+    })
+    acts.appendChild(noteBtn)
     // Day-91 calibration signal: only on a precise reverse-match (a deliberate lookup
     // disposition), not on live type-ahead — keeps the user_event class free of noise.
     if (precise) {
-      const acts = document.createElement("div"); acts.style.cssText = "margin-top:6px;display:flex;gap:8px"
       const mk = (label, action) => {
         const b = document.createElement("button"); b.className = "ghost mini"; b.textContent = label
         b.addEventListener("click", async (ev) => {
@@ -888,14 +897,11 @@
         })
         return b
       }
-      acts.appendChild(mk("✓ useful", "accepted")); acts.appendChild(mk("✗ not it", "rejected")); item.appendChild(acts)
+      acts.appendChild(mk("✓ useful", "accepted")); acts.appendChild(mk("✗ not it", "rejected"))
     }
-    // Click → select this person for a note (the Log-a-note panel is on this same surface).
-    item.addEventListener("click", () => {
-      $("n_person").value = p.person_id; $("n_search").value = p.full_name; $("n_results").innerHTML = ""
-      $("n_text").scrollIntoView({ behavior: "smooth", block: "center" }); $("n_text").focus()
-      show($("n_out"), "selected " + p.full_name + " · " + p.person_id + " — log a note below", true)
-    })
+    item.appendChild(acts)
+    // Primary action: open the full profile.
+    item.addEventListener("click", () => { if (p.person_id) showProfile(p.person_id) })
     return item
   }
 
@@ -1270,19 +1276,26 @@
     mount.innerHTML = ""
     const lab = document.createElement("div"); lab.className = "hint"
     lab.style.cssText = "text-transform:uppercase;letter-spacing:.1em;color:var(--gold);margin-bottom:8px"
-    lab.textContent = "rewordings, as theses · use one to dispose it in"
+    lab.textContent = "rewordings, as theses · edit any one, then use it to dispose it in"
     mount.appendChild(lab)
     for (const o of r.options) {
       const row = document.createElement("div")
       row.style.cssText = "display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)"
       const g = document.createElement("span"); g.style.marginTop = "3px"; g.innerHTML = markSpan("inf_hollow", "mk-inf"); row.appendChild(g)
       const txt = document.createElement("div"); txt.style.flex = "1"
-      const t = document.createElement("div"); t.style.fontStyle = "italic"; t.textContent = o.text; txt.appendChild(t)
+      // Feedback #8: the reword is editable in place — a textarea prefilled with the
+      // model's sentence, so you tune it manually before disposing it in. Use applies
+      // the (possibly edited) text, never the original blindly.
+      const ta = document.createElement("textarea"); ta.value = o.text
+      ta.style.cssText = "width:100%;font-style:italic;min-height:52px;margin:0"
+      txt.appendChild(ta)
       if (o.why) { const w = document.createElement("div"); w.className = "hint"; w.style.marginTop = "2px"; w.textContent = o.why; txt.appendChild(w) }
       row.appendChild(txt)
       const use = mkBtn("Use", "btn-accept", async () => {
+        const val = ta.value.trim()
+        if (!val) { alert("Empty — edit the wording first."); return }
         use.disabled = true; use.textContent = "…"
-        try { await apply(o.text); mount.innerHTML = '<p class="hint">Disposed into the ' + (target === "proposition" ? "thesis" : "action") + ".</p>" }
+        try { await apply(val); mount.innerHTML = '<p class="hint">Disposed into the ' + (target === "proposition" ? "thesis" : "action") + ".</p>" }
         catch (e) { use.disabled = false; use.textContent = "Use"; alert(e.message) }
       })
       use.style.cssText = "margin-top:0;padding:5px 12px;font-size:11px"
@@ -1336,6 +1349,10 @@
     const slot = document.createElement("div"); slot.id = "inlineSlot"; slot.className = "inline-edit"; d.appendChild(slot)
     const out = document.createElement("div"); out.className = "out"; out.id = "disp_out"; d.appendChild(out)
     renderEvidence(s)
+    // Feedback #3: on a narrow window the 3-panel grid stacks, so the detail renders
+    // BELOW the rail and the click looks dead. Scroll it into view so selecting a
+    // thesis always visibly does something.
+    if (window.matchMedia && window.matchMedia("(max-width: 900px)").matches) d.scrollIntoView({ behavior: "smooth", block: "start" })
   }
 
   function renderEvidence(s) {
@@ -1996,12 +2013,10 @@
     const pill = document.createElement("div"); pill.className = "hint"; pill.style.marginTop = "4px"
     pill.innerHTML = '<span style="color:' + (TASK_STATUS_COLOR[t.status] || "var(--ink-dim)") + '">● ' + t.status + "</span>"; c.appendChild(pill)
     if (t.status === "open" || t.status === "stalled") {
-      // Only actionable tasks move between horizons; the select stays as the fallback.
+      // Horizon is now set by dragging the card between the now/next/later columns
+      // (piece #2); the dropdown was removed per feedback. Only done/abandon remain.
       makeDraggable(c, "task", t.id, t.horizon)
       const acts = document.createElement("div"); acts.className = "acts"; acts.style.marginTop = "5px"
-      const hsel = document.createElement("select"); hsel.style.cssText = "font-size:11px;padding:2px 4px"
-      for (const hh of HORIZONS) { const o = document.createElement("option"); o.value = hh; o.textContent = hh; if (hh === t.horizon) o.selected = true; hsel.appendChild(o) }
-      hsel.addEventListener("change", () => moveTaskHorizon(t.id, hsel.value)); acts.appendChild(hsel)
       acts.appendChild(mkBtn("✓ done", "btn-accept", () => taskAct(t.id, "completed")))
       acts.appendChild(mkBtn("✕", "btn-reject", () => taskAct(t.id, "abandoned")))
       c.appendChild(acts)
