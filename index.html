@@ -459,11 +459,10 @@
     <div id="newsView" class="hidden">
     <div class="panel">
       <h2>News <button class="ghost mini" id="newsRefresh" style="margin-left:10px">refresh</button></h2>
-      <p class="hint">The news-fit gate. Every incoming story is scored against your positioning <em>before</em> the resonator turns it into theses. <strong>Held</strong> = below the fit floor, suppressed (no theses generated). <strong>Validate</strong> promotes a held story to the resonator queue (overrides the model); <strong>Park</strong> mutes it. Eligible / Validated already flow — <strong>Hold</strong> pulls one back. This is the review half of the gate: the model proposes, you dispose. No calibration signal is written here.</p>
+      <p class="hint">The news-fit gate. Every story is scored against your positioning <em>before</em> the resonator turns it into theses. <strong>Eligible</strong> = flowing (default). <strong>Parked</strong> = the system's auto set-aside for low-fit (muted, expires from view). <strong>Held</strong> = <em>your</em> manual set-aside. <strong>Validate</strong> promotes a parked/held story back into flow; <strong>Hold</strong> / <strong>Park</strong> set one aside. Per item you can also <strong>turn it into a thesis</strong> (a landscape sounding to dispose) or <strong>analyze</strong> what it already touches. Model proposes, you dispose — no calibration signal is written here.</p>
       <div class="nav" id="newsStateNav" style="margin-bottom:14px">
-        <button data-state="held" class="active">Held</button>
-        <button data-state="eligible">Eligible</button>
-        <button data-state="validated">Validated</button>
+        <button data-state="eligible" class="active">Eligible</button>
+        <button data-state="held">Held</button>
         <button data-state="parked">Parked</button>
         <button data-state="all">All</button>
       </div>
@@ -1318,7 +1317,7 @@
     claim.textContent = s.claim || "(no claim)"
     if (s.amended) { const m = document.createElement("span"); m.className = "amended-tag"; m.textContent = " · amended"; claim.appendChild(m) }
     d.appendChild(claim)
-    if (s.rationale) { const r = document.createElement("div"); r.className = "rationale"; r.textContent = s.rationale; d.appendChild(r) }
+    if (s.rationale && s.rationale !== s.claim) { const r = document.createElement("div"); r.className = "rationale"; r.textContent = s.rationale; d.appendChild(r) }
     if (s.suggested_action) { const a = document.createElement("div"); a.className = "sugact"; a.textContent = "→ " + s.suggested_action; d.appendChild(a) }
     if (s.asset) {
       const ab = document.createElement("div"); ab.className = "asset-bring"
@@ -2175,8 +2174,10 @@
   })
   $("refreshBtn").addEventListener("click", loadPending)
   // ── News tab (news-fit gate review) ─────────────────────────────────────
-  let NEWS_STATE = "held"
-  const NEWS_STATE_COLOR = { held: "var(--ink-dim)", eligible: "var(--green)", validated: "var(--gold)", parked: "var(--reject)" }
+  let NEWS_STATE = "eligible"
+  // eligible = flowing (green); held = your manual set-aside (gold, wants attention);
+  // parked = system auto set-aside (dim); validated (old rows) reads as flowing.
+  const NEWS_STATE_COLOR = { held: "var(--gold)", eligible: "var(--green)", validated: "var(--green)", parked: "var(--ink-faint)" }
 
   async function loadNews() {
     const host = $("newsList"); host.textContent = "loading…"
@@ -2214,19 +2215,65 @@
     const summary = document.createElement("div"); summary.style.cssText = "color:var(--ink-dim);font-size:13px;margin-bottom:8px"
     summary.textContent = (it.summary || "").slice(0, 220)
 
-    const actions = document.createElement("div"); actions.style.cssText = "display:flex;gap:8px"
+    const actions = document.createElement("div"); actions.style.cssText = "display:flex;gap:8px;flex-wrap:wrap"
     const mk = (label, action, cls) => { const b = document.createElement("button"); b.className = cls; b.textContent = label; b.onclick = () => disposeNews(it.event_id, action); return b }
+    // State transitions: parked/held → Validate (back into flow); eligible → Hold/Park (set aside).
     if (it.fit_state === "held") actions.append(mk("Validate", "validate", "mini"), mk("Park", "park", "mini ghost"))
     else if (it.fit_state === "parked") actions.append(mk("Validate", "validate", "mini"), mk("Hold", "hold", "mini ghost"))
     else actions.append(mk("Hold", "hold", "mini ghost"), mk("Park", "park", "mini ghost"))  // eligible / validated
+    // Per-item actions (Day 123): turn the story into a disposable theme thesis, or
+    // analyze what it already touches. Independent of fit_state.
+    const thBtn = document.createElement("button"); thBtn.className = "mini ghost"; thBtn.innerHTML = markSpan("inf_hollow", "mk-inf") + " thesis"
+    thBtn.title = "Turn into a landscape thesis in your Theses feed"; thBtn.onclick = () => newsToThesis(it.event_id, thBtn)
+    const anBtn = document.createElement("button"); anBtn.className = "mini ghost"; anBtn.textContent = "⊙ analyze"
+    anBtn.onclick = () => analyzeEvent(it.event_id, card)
+    actions.append(thBtn, anBtn)
 
-    card.append(head, title, summary, actions)
+    const slot = document.createElement("div"); slot.className = "news-analyze"; slot.style.marginTop = "8px"
+    card.append(head, title, summary, actions, slot)
     return card
   }
 
   async function disposeNews(eventId, action) {
     try { await api("news_dispose", { event_id: eventId, action }); loadNews() }
     catch (e) { alert(e.message) }
+  }
+
+  // Turn a news item into a theme thesis in the Theses feed (server mints a hypothesis-less,
+  // model-free suggestion). On success, point the operator to where to dispose it.
+  async function newsToThesis(eventId, btn) {
+    btn.disabled = true; const prev = btn.innerHTML; btn.textContent = "…"
+    try {
+      const r = await api("news_to_thesis", { event_id: eventId })
+      btn.textContent = "✓ in Theses"
+      alert("Added to your Theses feed as a landscape sounding:\n\n“" + (r.claim || "") + "”\n\nOpen Theses to accept or reject it.")
+    } catch (e) { btn.disabled = false; btn.innerHTML = prev; alert(e.message) }
+  }
+
+  // Analyze: a read-only panel of what this event already touches — the theses the
+  // resonator generated from it (and who they're about) + its fit. No new guesses.
+  async function analyzeEvent(eventId, card) {
+    const slot = card.querySelector(".news-analyze")
+    if (slot.dataset.open === "1") { slot.innerHTML = ""; slot.dataset.open = "0"; return }
+    slot.dataset.open = "1"; slot.innerHTML = '<p class="hint">analyzing…</p>'
+    let r
+    try { r = await api("analyze_event", { event_id: eventId }) }
+    catch (e) { slot.innerHTML = '<p class="out err" style="display:block">' + esc(e.message) + "</p>"; return }
+    let h = '<div class="grounding">'
+    const ev = r.event || {}
+    const topics = [].concat(ev.topics || [], ev.sectors || []).filter(Boolean)
+    h += '<p class="col-head soft-head">What it touches' + (ev.fit_state ? ' <span class="side">· ' + esc(ev.fit_state) + (ev.fit_score != null ? " · fit " + Number(ev.fit_score).toFixed(3) : "") + '</span>' : "") + "</p>"
+    if (topics.length) h += '<div class="prow"><span class="side">topics</span> ' + esc(topics.join(" · ")) + "</div>"
+    const th = r.theses || []
+    if (th.length) {
+      h += '<div class="prow"><span class="side">' + th.length + ' thes' + (th.length === 1 ? "is" : "es") + ' generated</span></div>'
+      for (const t of th) h += '<div class="prow">' + subjectMark(t.subject.type) + " " + esc(t.subject.name) +
+        ' <span class="side">' + esc(t.status) + "</span><br>" + esc(t.claim) + "</div>"
+    } else {
+      h += '<p class="empty" style="margin-top:6px">No theses generated from this story yet' + (ev.fit_state === "parked" || ev.fit_state === "held" ? " (it is set aside, so the resonator skips it)." : ".") + "</p>"
+    }
+    h += "</div>"
+    slot.innerHTML = h
   }
 
   function initNewsStateNav() {
