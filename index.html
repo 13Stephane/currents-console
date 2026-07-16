@@ -186,6 +186,20 @@
   .prow { margin-bottom: 9px; font-size: 14px; line-height: 1.45; }
   .prow .lead { color: var(--ink); }
   .prow .side { font-family: "IBM Plex Mono", monospace; font-size: 10.5px; color: var(--ink-faint); }
+  /* click-to-see-why (Day 123): the shared grounding panel, a nested/quieter surface.
+     Reads the soft layer an inferred claim rests on; ◇ marks the inference grammar. */
+  .grounding { border-left: 2px solid var(--gold); padding: 4px 0 4px 12px; margin: 6px 0 2px; }
+  .grounding .col-head { font-family: "IBM Plex Mono", monospace; font-size: 10px; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--gold); margin: 0 0 8px; font-weight: 400; }
+  .grounding .prow { margin-bottom: 6px; font-size: 13px; color: var(--ink-dim); }
+  .grounding .prow .side { color: var(--ink-faint); }
+  .grounding .col-head .side { font-family: "IBM Plex Mono", monospace; font-size: 10px; color: var(--ink-faint); letter-spacing: 0; }
+  /* drag-and-drop the boards (Day 123 piece #2): a card grabs and moves between
+     columns; the <select> stays as the keyboard/a11y fallback. */
+  .dcard { cursor: grab; }
+  .dcard:active { cursor: grabbing; }
+  .dcard.dragging { opacity: .4; }
+  .dcol.drop-active { outline: 2px dashed var(--gold); outline-offset: -3px; background: rgba(198,165,83,.07) !important; }
   .pint { border-left: 2px solid var(--line); padding-left: 11px; margin-bottom: 11px; }
   .pint .ihdr { font-family: "IBM Plex Mono", monospace; font-size: 10px; color: var(--ink-faint);
     letter-spacing: .04em; margin-bottom: 3px; }
@@ -260,9 +274,8 @@
 
   <div id="app" class="hidden">
     <div class="nav">
-      <button id="navAdd" class="active">Add</button>
+      <button id="navAdd" class="active">Find / add</button>
       <button id="navDispose">Theses</button>
-      <button id="navLookup">Lookup</button>
       <button id="navInitiatives">Initiatives</button>
       <button id="navPropositions">Propositions</button>
       <button id="navTasks">Tasks</button>
@@ -270,7 +283,27 @@
     </div>
 
     <div id="addView">
-    <div class="panel">
+    <div class="panel" id="finderPanel">
+      <h2>Find or add</h2>
+      <p class="hint">Search what you already know — people and organizations — before adding, so you never make a duplicate. Type a name; add precision keys (email / LinkedIn) to resolve exactly. Nothing matches? Add it inline. Read-only search; keys resolve precisely, a name alone surfaces every twin (never auto-matched).</p>
+      <input id="rm_q" placeholder="Search people &amp; orgs by name…" autocomplete="off">
+      <details id="find_keys" style="margin-top:8px">
+        <summary class="hint" style="cursor:pointer;user-select:none">precision keys — email · LinkedIn · people-at-org</summary>
+        <div class="row" style="margin-top:8px">
+          <div><label>Email</label><input id="rm_email" placeholder="jane@acme.com" autocomplete="off"></div>
+          <div><label>LinkedIn URL</label><input id="rm_linkedin" placeholder="linkedin.com/in/…" autocomplete="off"></div>
+        </div>
+        <div class="row">
+          <div><label>Organization (people at)</label><input id="rm_org" placeholder="Acme AB" autocomplete="off"></div>
+        </div>
+        <button id="rm_btn" class="ghost mini">Match precisely</button>
+      </details>
+      <div class="out" id="rm_out"></div>
+      <div id="find_results" class="search-results" style="margin-top:12px"></div>
+      <div id="find_add" style="margin-top:12px"></div>
+    </div>
+
+    <div class="panel" id="addPersonPanel">
       <h2>Add person</h2>
       <label>Full name *</label>
       <input id="p_name" placeholder="Jane Doe">
@@ -381,25 +414,6 @@
         </div>
       </div>
     </div><!-- /disposeView -->
-
-    <div id="lookupView" class="hidden">
-    <div class="panel">
-      <h2>Reverse-match</h2>
-      <p class="hint">Paste what you have — a name, email, LinkedIn URL, or org — and see who you already know. Read-only: keys (email / LinkedIn) resolve precisely; a name alone surfaces every twin for you to pick (never auto-matched).</p>
-      <label>Name</label>
-      <input id="rm_q" placeholder="Jane Doe" autocomplete="off">
-      <div class="row">
-        <div><label>Email</label><input id="rm_email" placeholder="jane@acme.com" autocomplete="off"></div>
-        <div><label>LinkedIn URL</label><input id="rm_linkedin" placeholder="linkedin.com/in/…" autocomplete="off"></div>
-      </div>
-      <div class="row">
-        <div><label>Organization</label><input id="rm_org" placeholder="Acme AB" autocomplete="off"></div>
-      </div>
-      <button id="rm_btn">Match</button>
-      <div class="out" id="rm_out"></div>
-      <div id="rm_results" class="search-results" style="margin-top:14px"></div>
-    </div>
-    </div><!-- /lookupView -->
 
     <div id="initiativesView" class="hidden">
     <div class="panel">
@@ -780,79 +794,136 @@
   let SUGS = [], SELID = null
 
   function setNav(active) {
-    for (const id of ["navAdd", "navDispose", "navLookup", "navInitiatives", "navPropositions", "navTasks", "navNews"]) $(id).classList.toggle("active", id === active)
+    for (const id of ["navAdd", "navDispose", "navInitiatives", "navPropositions", "navTasks", "navNews"]) $(id).classList.toggle("active", id === active)
     $("addView").classList.toggle("hidden", active !== "navAdd")
     $("disposeView").classList.toggle("hidden", active !== "navDispose")
-    $("lookupView").classList.toggle("hidden", active !== "navLookup")
     $("initiativesView").classList.toggle("hidden", active !== "navInitiatives")
     $("propositionsView").classList.toggle("hidden", active !== "navPropositions")
     $("tasksView").classList.toggle("hidden", active !== "navTasks")
     $("newsView").classList.toggle("hidden", active !== "navNews")
     document.body.classList.toggle("wide", active === "navDispose")
   }
-  function showAdd() { setNav("navAdd") }
+  function showAdd() { setNav("navAdd"); $("rm_q").focus() }
   function showDispose() { setNav("navDispose"); loadSuggestions() }
-  function showLookup() { setNav("navLookup"); $("rm_q").focus() }
   function showInitiatives() { setNav("navInitiatives"); $("i_intent").focus() }
   function showPropositions() { setNav("navPropositions"); loadPropositions() }
   function showTasks() { setNav("navTasks"); loadTasks() }
   function showNews() { setNav("navNews"); loadNews() }
 
-  // ---- reverse-match (Day 90): resolve a pasted name/email/linkedin/org against the spine ----
-  async function reverseMatch() {
+  // ---- Find or add (Day 123, piece #3): one search-first surface over people + orgs,
+  // then an inline add when nothing matches. Folds in the Day-90 reverse-match (precise
+  // key resolution, calibratable) and the Day-88 name search, and consolidates the old
+  // Lookup + Add tabs into one. Read-only search; the add routes to the forms below.
+  const BASIS_LABEL = { primary_email: "email", emails_overlap: "email", linkedin_url: "LinkedIn", org_member: "at org", name: "name" }
+
+  let finderTimer = null
+  function onFinderInput() {
+    clearTimeout(finderTimer)
+    finderTimer = setTimeout(() => runFinder({}), 250)
+  }
+
+  // precise=true → reverse_match (keys resolve exactly; result is a calibratable lookup).
+  // Otherwise a live name search across people (search_people) AND orgs (search_orgs).
+  async function runFinder(opts) {
+    opts = opts || {}
     const q = $("rm_q").value.trim(), email = $("rm_email").value.trim()
     const linkedin_url = $("rm_linkedin").value.trim(), org = $("rm_org").value.trim()
-    const host = $("rm_results"); host.innerHTML = ""
-    if (!q && !email && !linkedin_url && !org) { show($("rm_out"), "Enter a name, email, LinkedIn URL, or org.", false); return }
+    const hasKeys = !!(email || linkedin_url || org)
+    const results = $("find_results"), addHost = $("find_add"), out = $("rm_out")
+    if (!q && !hasKeys) { results.innerHTML = ""; addHost.innerHTML = ""; out.textContent = ""; out.className = "out"; return }
+    const precise = opts.precise || hasKeys
+    if (!precise && q.length < 2) { results.innerHTML = ""; addHost.innerHTML = ""; return }
+    results.innerHTML = ""
     try {
-      const r = await api("reverse_match", { q, email, linkedin_url, org })
-      const ms = r.matches || []
-      if (!ms.length) { show($("rm_out"), "No match. Nothing known yet — add them under Add.", true); return }
-      const ambiguous = ms.some(m => m.is_ambiguous)
-      show($("rm_out"), ms.length + (ms.length === 1 ? " match" : " matches")
-        + (ambiguous ? " · name-only — confirm which one" : ""), true)
-      const basisLabel = { primary_email: "email", emails_overlap: "email", linkedin_url: "LinkedIn", org_member: "at org", name: "name" }
-      for (const m of ms) {
-        const item = document.createElement("div"); item.className = "search-hit"
-        if (m.person_id) addProfileBtn(item, m.person_id)
-        const nm = document.createElement("div"); nm.className = "sh-name"
-        nm.textContent = m.full_name + (m.is_ambiguous ? "  ·  ?" : "")
-        const bits = [basisLabel[m.match_basis] || m.match_basis, m.current_org, m.primary_email, m.location].filter(Boolean)
-        item.appendChild(nm)
-        const meta = document.createElement("div"); meta.className = "sh-meta"; meta.textContent = bits.join(" · ")
-        item.appendChild(meta)
-        // Step C (Day 91): explicit user_event calibration signal on the lookup.
-        // accepted = the match was useful; rejected = not a match. Buttons stop
-        // propagation so they don't trigger the row-click (navigation only).
-        const acts = document.createElement("div")
-        acts.style.cssText = "margin-top:6px;display:flex;gap:8px"
-        const mkBtn = (label, action) => {
-          const b = document.createElement("button"); b.className = "ghost mini"; b.textContent = label
-          b.addEventListener("click", async (ev) => {
-            ev.stopPropagation()
-            if (await rmDispose(m, action)) {
-              item.style.opacity = "0.5"
-              acts.querySelectorAll("button").forEach(x => x.disabled = true)
-              show($("rm_out"), (action === "accepted" ? "✓ recorded useful · " : "✗ recorded not-a-match · ") + m.full_name, true)
-            }
-          })
-          return b
-        }
-        acts.appendChild(mkBtn("✓ useful", "accepted"))
-        acts.appendChild(mkBtn("✗ not it", "rejected"))
-        item.appendChild(acts)
-        item.addEventListener("click", () => {
-          // reuse the Add-view note wiring: select this person, jump to Log-a-note
-          $("n_person").value = m.person_id
-          $("n_search").value = m.full_name
-          $("n_results").innerHTML = ""
-          showAdd()
-          $("n_text").focus()
-          show($("n_out"), "selected " + m.full_name + " · " + m.person_id, true)
-        })
-        host.appendChild(item)
+      let people = [], orgs = []
+      if (precise) {
+        const r = await api("reverse_match", { q, email, linkedin_url, org })
+        people = (r.matches || []).map((m) => ({
+          person_id: m.person_id, full_name: m.full_name, org: m.current_org ?? null,
+          email: m.primary_email ?? null, location: m.location ?? null,
+          match_basis: m.match_basis, is_ambiguous: !!m.is_ambiguous,
+        }))
+      } else {
+        const [rp, ro] = await Promise.all([
+          api("search_people", { q }).catch(() => ({ people: [] })),
+          api("search_orgs", { q }).catch(() => ({ orgs: [] })),
+        ])
+        people = (rp.people || []).map((p) => ({
+          person_id: p.id, full_name: p.full_name, org: p.org ?? null,
+          email: p.email ?? null, location: p.location ?? null,
+          match_basis: "name", is_ambiguous: false,
+        }))
+        orgs = ro.orgs || []
       }
-    } catch (e) { show($("rm_out"), e.message, false) }
+      let n = 0
+      for (const p of people) { results.appendChild(finderPersonItem(p, precise)); n++ }
+      for (const o of orgs) { results.appendChild(finderOrgItem(o)); n++ }
+      if (!n) results.innerHTML = '<p class="hint">Nothing known yet.</p>'
+      const ambiguous = precise && people.some((p) => p.is_ambiguous)
+      show(out, n + (n === 1 ? " match" : " matches") + (ambiguous ? " · name-only — confirm which one" : ""), true)
+      renderFinderAdd(q || org, n, precise)
+    } catch (e) { show(out, e.message, false) }
+  }
+
+  function finderPersonItem(p, precise) {
+    const item = document.createElement("div"); item.className = "search-hit"
+    if (p.person_id) addProfileBtn(item, p.person_id)
+    const nm = document.createElement("div"); nm.className = "sh-name"
+    nm.innerHTML = subjectMark("person") + " " + esc(p.full_name) + (p.is_ambiguous ? '  <span class="side">· ?</span>' : "")
+    item.appendChild(nm)
+    const bits = [BASIS_LABEL[p.match_basis] || p.match_basis, p.org, p.email, p.location].filter(Boolean)
+    const meta = document.createElement("div"); meta.className = "sh-meta"; meta.textContent = bits.join(" · "); item.appendChild(meta)
+    // Day-91 calibration signal: only on a precise reverse-match (a deliberate lookup
+    // disposition), not on live type-ahead — keeps the user_event class free of noise.
+    if (precise) {
+      const acts = document.createElement("div"); acts.style.cssText = "margin-top:6px;display:flex;gap:8px"
+      const mk = (label, action) => {
+        const b = document.createElement("button"); b.className = "ghost mini"; b.textContent = label
+        b.addEventListener("click", async (ev) => {
+          ev.stopPropagation()
+          if (await rmDispose(p, action)) {
+            item.style.opacity = "0.5"; acts.querySelectorAll("button").forEach((x) => (x.disabled = true))
+            show($("rm_out"), (action === "accepted" ? "✓ recorded useful · " : "✗ recorded not-a-match · ") + p.full_name, true)
+          }
+        })
+        return b
+      }
+      acts.appendChild(mk("✓ useful", "accepted")); acts.appendChild(mk("✗ not it", "rejected")); item.appendChild(acts)
+    }
+    // Click → select this person for a note (the Log-a-note panel is on this same surface).
+    item.addEventListener("click", () => {
+      $("n_person").value = p.person_id; $("n_search").value = p.full_name; $("n_results").innerHTML = ""
+      $("n_text").scrollIntoView({ behavior: "smooth", block: "center" }); $("n_text").focus()
+      show($("n_out"), "selected " + p.full_name + " · " + p.person_id + " — log a note below", true)
+    })
+    return item
+  }
+
+  function finderOrgItem(o) {
+    const item = document.createElement("div"); item.className = "search-hit"
+    const nm = document.createElement("div"); nm.className = "sh-name"
+    nm.innerHTML = subjectMark("org") + " " + esc(o.name)
+    item.appendChild(nm)
+    const bits = ["org", o.industry, o.country, o.size_band].filter(Boolean)
+    const meta = document.createElement("div"); meta.className = "sh-meta"; meta.textContent = bits.join(" · "); item.appendChild(meta)
+    return item
+  }
+
+  // The inline "add" affordance — the second half of "find or add". Routes to the
+  // existing add-person / add-org forms on this surface, prefilled with the query.
+  function renderFinderAdd(q, matchCount, precise) {
+    const host = $("find_add"); host.innerHTML = ""
+    if (!q) return
+    const lead = document.createElement("div"); lead.className = "hint"
+    lead.textContent = matchCount ? "Not who you meant? Add new:" : "Nothing matches — add:"
+    host.appendChild(lead)
+    const row = document.createElement("div"); row.style.cssText = "display:flex;gap:8px;margin-top:6px;flex-wrap:wrap"
+    row.appendChild(mkBtn("+ person “" + q + "”", "btn-edit", () => prefillAdd("p_name", q)))
+    row.appendChild(mkBtn("+ org “" + q + "”", "btn-edit", () => prefillAdd("o_name", q)))
+    host.appendChild(row)
+  }
+  function prefillAdd(fieldId, q) {
+    const el = $(fieldId); el.value = q; el.scrollIntoView({ behavior: "smooth", block: "center" }); el.focus()
   }
 
   // Step C (Day 91): record a model-free user_event disposition for a reverse-match
@@ -1269,8 +1340,8 @@
 
   function renderEvidence(s) {
     const host = $("evidence"); host.innerHTML = ""
-    if (!s.evidence || !s.evidence.length) { host.innerHTML = '<p class="empty">No linked evidence.</p>'; return }
-    for (const e of s.evidence) {
+    const evs = s.evidence || []
+    for (const e of evs) {
       const it = document.createElement("div"); it.className = "ev-item"
       if (e.url) {
         const a = document.createElement("a"); a.href = e.url; a.target = "_blank"; a.rel = "noopener"
@@ -1280,6 +1351,69 @@
       const k = document.createElement("div"); k.className = "ekind"
       k.textContent = [e.kind, (e.occurred_at || "").slice(0, 10)].filter(Boolean).join(" · "); it.appendChild(k)
       host.appendChild(it)
+    }
+    // Click-to-see-why (Day 123): world_events answer "what happened", but an inferred
+    // person-claim (a fit-hypothesis, a soft-layer read) also rests on the person's
+    // drivers/needs — the confession layer the feed never surfaced. Offer that grounding
+    // for any person subject, so "how do I know?" is answerable even with no linked event.
+    if (s.person_id) {
+      const slot = document.createElement("div"); slot.className = "why-slot"; slot.style.marginTop = "8px"
+      const btn = mkBtn(evs.length ? "◇ soft-layer grounding" : "◇ see grounding · drivers & needs", "ghost mini", () => {
+        if (slot.dataset.open === "1") { slot.innerHTML = ""; slot.dataset.open = "0"; btn.textContent = evs.length ? "◇ soft-layer grounding" : "◇ see grounding · drivers & needs"; return }
+        slot.dataset.open = "1"; btn.textContent = "◇ hide grounding"
+        renderGrounding(slot, { person_id: s.person_id })
+      })
+      host.appendChild(btn); host.appendChild(slot)
+    } else if (!evs.length) {
+      host.appendChild(Object.assign(document.createElement("p"), { className: "empty", textContent: "No linked evidence." }))
+    }
+  }
+
+  // Click-to-see-why (Day 123): the shared "why" panel. Given a person and (optionally)
+  // the intent-ranked top_signals, it renders the soft-layer grounding an inferred claim
+  // rests on — the ranked signals that produced the match, plus the person's full current
+  // drivers/needs (fetched read-only via get_person). Doctrine: read-only, no raw
+  // confidence (get_person strips it), gaps render as gaps, ◇ marks the inference layer.
+  // Reused by the feed evidence panel and each initiative candidate.
+  const PERSON_CACHE = {}
+  async function getPersonCached(pid) {
+    if (PERSON_CACHE[pid]) return PERSON_CACHE[pid]
+    const r = await api("get_person", { person_id: pid })
+    PERSON_CACHE[pid] = r.person
+    return r.person
+  }
+  async function renderGrounding(mount, opts) {
+    const sigs = (opts.top_signals || []).filter(Boolean)
+    let h = '<div class="grounding">'
+    // The intent-ranked signals: the exact soft-layer text, closest to the intent first,
+    // that made this person rank. This is the direct "why" for a fit-claim.
+    if (sigs.length) {
+      const sim = (typeof opts.best_sim === "number") ? opts.best_sim.toFixed(3) : null
+      h += '<p class="col-head soft-head">Ranked on' + (sim ? ' <span class="side">· fit ' + sim + (opts.top_kind ? " · " + esc(opts.top_kind) : "") + '</span>' : "") + "</p>"
+      for (const sg of sigs) h += '<div class="prow">' + markSpan("inf_hollow", "mk-inf") + " " + esc(sg) + "</div>"
+    }
+    h += '<div class="ground-soft"><p class="hint">reading the soft layer…</p></div>'
+    mount.innerHTML = h + "</div>"
+    const softHost = mount.querySelector(".ground-soft")
+    if (!opts.person_id) { softHost.innerHTML = ""; return }
+    try {
+      const p = await getPersonCached(opts.person_id)
+      const dv = p.drivers || [], nd = p.needs || []
+      let sh = ""
+      if (dv.length || nd.length) {
+        sh += '<p class="col-head soft-head" style="margin-top:8px">Drivers &amp; needs</p>'
+        for (const d of dv) sh += '<div class="prow"><span class="side">drive</span> ' + esc(d.description) + "</div>"
+        for (const n of nd) sh += '<div class="prow"><span class="side">need' + (n.org ? " · " + esc(n.org) : "") + '</span> ' + esc(n.description) + "</div>"
+      } else {
+        // Gaps render as gaps: no fabricated grounding when the soft layer is empty.
+        sh += '<p class="empty" style="margin-top:8px">No drivers or needs recorded — this claim has no soft-layer grounding yet.</p>'
+      }
+      softHost.innerHTML = sh
+      const prof = mkBtn("full profile ↗", "ghost mini", () => showProfile(opts.person_id))
+      prof.style.marginTop = "8px"; prof.innerHTML = subjectMark("person") + " full profile ↗"
+      softHost.appendChild(prof)
+    } catch (e) {
+      softHost.innerHTML = '<p class="empty" style="margin-top:8px">Could not load grounding: ' + esc(e.message) + "</p>"
     }
   }
 
@@ -1459,8 +1593,21 @@
       nm.textContent = Number(c.best_sim).toFixed(3) + "  " + (c.full_name || "(no name)")
       item.appendChild(nm)
       const meta = document.createElement("div"); meta.className = "sh-meta"
-      meta.textContent = "[" + (c.top_kind || "?") + "] " + (c.top_signal || "")
+      // ▸ why: a dispatched fit-claim is composed from these signals; the affordance
+      // makes that grounding legible BEFORE dispatch, so the floor is chosen on evidence.
+      meta.textContent = "[" + (c.top_kind || "?") + "] " + (c.top_signal || "") + "   ▸ why"
       item.appendChild(meta)
+      const slot = document.createElement("div"); slot.className = "why-slot"; slot.style.marginTop = "6px"
+      item.appendChild(slot)
+      // Click-to-see-why (Day 123): a ranked candidate shows a similarity and one signal,
+      // but no answer to "why this person for this intent". Toggle the shared grounding
+      // panel — the full ranked signals + the person's drivers/needs — read-only.
+      item.addEventListener("click", (ev) => {
+        if (ev.target.closest(".why-slot")) return   // clicks inside the panel don't re-toggle
+        if (slot.dataset.open === "1") { slot.innerHTML = ""; slot.dataset.open = "0"; return }
+        slot.dataset.open = "1"
+        renderGrounding(slot, { person_id: c.person_id, top_signals: c.top_signals, best_sim: c.best_sim, top_kind: c.top_kind })
+      })
       host.appendChild(item)
     }
   }
@@ -1714,6 +1861,40 @@
     h.textContent = headText; col.appendChild(h); return col
   }
 
+  // Drag-and-drop the boards (Day 123 piece #2). The moved item's identity rides a
+  // module var (dataTransfer is unreliable across browsers and absent in headless
+  // renders); dataTransfer is still set so the browser permits the drop. A same-column
+  // drop is a no-op (no write). The <select> stays as the keyboard/a11y fallback — and
+  // is the only path to declined/dropped, which have no board column.
+  let DRAG = null
+  function makeDraggable(card, kind, id, from) {
+    card.classList.add("dcard"); card.draggable = true; card.title = "drag to move"
+    card.addEventListener("dragstart", (e) => {
+      DRAG = { kind, id, from }; card.classList.add("dragging")
+      if (e.dataTransfer) { e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/plain", String(id)) } catch (_) {} }
+    })
+    card.addEventListener("dragend", () => {
+      card.classList.remove("dragging"); DRAG = null
+      document.querySelectorAll(".dcol.drop-active").forEach((el) => el.classList.remove("drop-active"))
+    })
+  }
+  function makeDropTarget(col, kind, to, onDrop) {
+    col.classList.add("dcol")
+    col.addEventListener("dragover", (e) => {
+      if (!DRAG || DRAG.kind !== kind) return
+      e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = "move"; col.classList.add("drop-active")
+    })
+    col.addEventListener("dragleave", (e) => { if (!col.contains(e.relatedTarget)) col.classList.remove("drop-active") })
+    col.addEventListener("drop", (e) => {
+      col.classList.remove("drop-active")
+      if (!DRAG || DRAG.kind !== kind) return
+      e.preventDefault()
+      const d = DRAG; DRAG = null
+      if (d.from === to) return   // dropped back in its own column — no write
+      onDrop(d.id, to)
+    })
+  }
+
   function renderPropDetail(p) {
     const host = $("propDetail"); host.innerHTML = ""
     const h = document.createElement("h2"); h.textContent = p.title
@@ -1746,6 +1927,7 @@
     const board = document.createElement("div"); board.style.cssText = "display:flex;gap:10px;flex-wrap:wrap"
     for (const stage of ["considering", "latent", "active", "committed"]) {
       const col = propColumn(STAGE_LABEL[stage], STAGE_COLOR[stage])
+      makeDropTarget(col, "stakeholder", stage, (personId, to) => setStage(p.id, personId, to))
       for (const s of p.stakeholders.filter((x) => x.stage === stage)) col.appendChild(stakeholderCard(p, s))
       board.appendChild(col)
     }
@@ -1771,6 +1953,7 @@
     const hz = document.createElement("div"); hz.style.cssText = "display:flex;gap:10px;flex-wrap:wrap"
     for (const horizon of HORIZONS) {
       const col = propColumn(horizon, null)
+      makeDropTarget(col, "task", horizon, (taskId, to) => moveTaskHorizon(taskId, to))
       const lane = p.tasks.filter((x) => x.horizon === horizon)
       if (!lane.length) { const e = document.createElement("div"); e.className = "hint"; e.textContent = "—"; col.appendChild(e) }
       for (const t of lane) col.appendChild(taskMini(t))
@@ -1794,6 +1977,8 @@
 
   function stakeholderCard(p, s) {
     const c = document.createElement("div"); c.style.cssText = "background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:6px 8px;margin-bottom:6px"
+    // Drag to advance the stage (piece #2); the select below stays as the fallback.
+    makeDraggable(c, "stakeholder", s.person_id, s.stage)
     const nm = document.createElement("div"); nm.style.cssText = "font-size:13px;font-weight:600"; nm.textContent = s.name; c.appendChild(nm)
     if (s.role) { const r = document.createElement("div"); r.className = "hint"; r.style.textTransform = "uppercase"; r.textContent = s.role.replace(/_/g, " "); c.appendChild(r) }
     const sel = document.createElement("select"); sel.style.cssText = "margin-top:5px;font-size:12px;padding:3px 5px;width:100%"
@@ -1811,6 +1996,8 @@
     const pill = document.createElement("div"); pill.className = "hint"; pill.style.marginTop = "4px"
     pill.innerHTML = '<span style="color:' + (TASK_STATUS_COLOR[t.status] || "var(--ink-dim)") + '">● ' + t.status + "</span>"; c.appendChild(pill)
     if (t.status === "open" || t.status === "stalled") {
+      // Only actionable tasks move between horizons; the select stays as the fallback.
+      makeDraggable(c, "task", t.id, t.horizon)
       const acts = document.createElement("div"); acts.className = "acts"; acts.style.marginTop = "5px"
       const hsel = document.createElement("select"); hsel.style.cssText = "font-size:11px;padding:2px 4px"
       for (const hh of HORIZONS) { const o = document.createElement("option"); o.value = hh; o.textContent = hh; if (hh === t.horizon) o.selected = true; hsel.appendChild(o) }
@@ -2038,7 +2225,6 @@
 
   $("navAdd").addEventListener("click", showAdd)
   $("navDispose").addEventListener("click", showDispose)
-  $("navLookup").addEventListener("click", showLookup)
   $("navInitiatives").addEventListener("click", showInitiatives)
   $("i_dryBtn").addEventListener("click", initiativeDryRun)
   $("i_liveBtn").addEventListener("click", initiativeDispatch)
@@ -2052,9 +2238,10 @@
   $("propRefresh").addEventListener("click", loadPropositions)
   $("p_createBtn").addEventListener("click", createProposition)
   $("composeClose").addEventListener("click", closeCompose)
-  $("rm_btn").addEventListener("click", reverseMatch)
+  $("rm_btn").addEventListener("click", (e) => { e.preventDefault(); runFinder({ precise: true }) })
+  $("rm_q").addEventListener("input", onFinderInput)
   for (const id of ["rm_q", "rm_email", "rm_linkedin", "rm_org"]) {
-    $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") reverseMatch() })
+    $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); runFinder({}) } })
   }
   $("dispRefresh").addEventListener("click", loadSuggestions)
   $("assetOnly").addEventListener("change", renderRail)
