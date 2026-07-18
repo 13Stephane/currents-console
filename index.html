@@ -458,13 +458,19 @@
 
     <div id="newsView" class="hidden">
     <div class="panel">
-      <h2>News <button class="ghost mini" id="newsRefresh" style="margin-left:10px">refresh</button></h2>
+      <h2>News</h2>
       <p class="hint">The news-fit gate. Every story is scored against your positioning <em>before</em> the resonator turns it into theses. <strong>Eligible</strong> = flowing (default). <strong>Parked</strong> = the system's auto set-aside for low-fit (muted, expires from view). <strong>Held</strong> = <em>your</em> manual set-aside. <strong>Validate</strong> promotes a parked/held story back into flow; <strong>Hold</strong> / <strong>Park</strong> set one aside. Per item you can also <strong>turn it into a thesis</strong> (a landscape sounding to dispose) or <strong>analyze</strong> what it already touches. Model proposes, you dispose — no calibration signal is written here.</p>
-      <div class="nav" id="newsStateNav" style="margin-bottom:14px">
+      <div class="nav" id="newsStateNav" style="margin-bottom:10px">
         <button data-state="eligible" class="active">Eligible</button>
         <button data-state="held">Held</button>
         <button data-state="parked">Parked</button>
         <button data-state="all">All</button>
+      </div>
+      <div class="nav" id="newsSortNav" style="margin-bottom:14px;align-items:center">
+        <span class="hint" style="margin:0 8px 0 0">sort</span>
+        <button data-sort="balanced" class="active" title="Fit × freshness — most relevant from recent days">Balanced</button>
+        <button data-sort="relevance" title="Pure fit score, ignores age">Relevance</button>
+        <button data-sort="newest" title="Most recently observed first">Newest</button>
       </div>
       <div id="newsList"></div>
     </div>
@@ -995,7 +1001,9 @@
 
   function closeProfile() { $("profileModal").classList.remove("show") }
 
+  let PROFILE = null   // Day 124: last-rendered profile, for the soft-layer edit form's item lookup.
   function renderProfile(p) {
+    PROFILE = p
     const id = p.identity, host = $("profileBody")
     let h = ""
     h += '<h2 class="pname">' + markSpan("person", "mk-person") + " " + esc(id.full_name) + (id.preferred_name ? ' <span class="side">“' + esc(id.preferred_name) + '”</span>' : "") + "</h2>"
@@ -1047,14 +1055,32 @@
     // close facts column, open inferences column
     h += '</div><div class="hub-col"><p class="col-head soft-head">Inferences · Soft</p>'
 
-    // Drivers / needs — both-halves current from the views; no raw confidence.
-    const dv = p.drivers || [], nd = p.needs || []
-    if (dv.length || nd.length) {
-      h += '<div class="psec"><h3>Drivers &amp; needs</h3>'
-      for (const d of dv) h += '<div class="prow"><span class="side">drive</span> ' + esc(d.description) + "</div>"
-      for (const n of nd) h += '<div class="prow"><span class="side">need' + (n.org ? " · " + esc(n.org) : "") + '</span> ' + esc(n.description) + "</div>"
-      h += "</div>"
-    }
+    // Drivers / needs / assets — both-halves current from the views; no raw confidence.
+    // Day 124: every row carries an ✎ edit affordance; section headers carry + add. These
+    // are the three per-contact soft-layer facets (drivers, needs, person_assets).
+    const softRow = (label, item, facet) =>
+      '<div class="prow"><span class="side">' + label + "</span> " + esc(item.description) +
+      (item.status && item.status !== "active" ? ' <span class="side">[' + esc(item.status) + "]</span>" : "") +
+      ' <button class="ghost mini soft-edit-btn" data-facet="' + facet + '" data-id="' + esc(item.id) + '">✎ edit</button></div>'
+    const dv = p.drivers || [], nd = p.needs || [], pa = p.person_assets || []
+    h += '<div class="psec"><h3>Drivers &amp; needs ' +
+      '<button class="ghost mini soft-add-btn" data-facet="driver">+ drive</button> ' +
+      '<button class="ghost mini soft-add-btn" data-facet="need">+ need</button></h3>'
+    for (const d of dv) h += softRow("drive", d, "driver")
+    for (const n of nd) h += softRow("need" + (n.org ? " · " + esc(n.org) : ""), n, "need")
+    if (!dv.length && !nd.length) h += '<p class="hint">None yet.</p>'
+    h += "</div>"
+
+    // Assets (Day 124) — qualifications, experience, connections (person_assets). Distinct
+    // from "Assets in play" above (owner content library the resonator cited to this person).
+    h += '<div class="psec"><h3>Assets · qualifications · experience · connections ' +
+      '<button class="ghost mini soft-add-btn" data-facet="asset">+ asset</button></h3>'
+    for (const a of pa) h += softRow("asset" + (a.asset_type ? " · " + esc(a.asset_type) : ""), a, "asset")
+    if (!pa.length) h += '<p class="hint">None yet.</p>'
+    h += "</div>"
+
+    // Inline add/edit form renders here (mirrors #enrichSlot).
+    h += '<div id="softEditSlot" class="inline-edit"></div>'
 
     // Open hypotheses — claim + empirical band (never the model number).
     const hy = p.hypotheses || []
@@ -1115,6 +1141,11 @@
     for (const b of host.querySelectorAll(".enrich-btn")) {
       b.addEventListener("click", () => openEnrichForm(id.id, b.getAttribute("data-org") || ""))
     }
+    // Day 124: wire the soft-layer add/edit affordances (drivers / needs / person_assets).
+    for (const b of host.querySelectorAll(".soft-add-btn"))
+      b.addEventListener("click", () => openSoftEditForm(b.getAttribute("data-facet"), id.id, null))
+    for (const b of host.querySelectorAll(".soft-edit-btn"))
+      b.addEventListener("click", () => openSoftEditForm(b.getAttribute("data-facet"), id.id, b.getAttribute("data-id")))
   }
 
   // Day 116: org-context enrichment form (the Day-107 payoff lever — industry/country/
@@ -1157,6 +1188,80 @@
     })
     save.style.marginTop = "10px"; slot.appendChild(save); slot.appendChild(out)
     org.focus()
+  }
+
+  // Day 124 — inline add/edit for the per-contact soft layer (drivers / needs / person_assets).
+  // itemId null = add (net-new, supersedes null); itemId set = edit (supersede that leaf).
+  // Provenance toggle: assert (operator decided, unchained) vs record (heard from someone —
+  // writes a chained personal_notes raw_input server-side, which owes an anchor at close).
+  // Mirrors openEnrichForm: builds into #softEditSlot, POSTs, re-reads the profile.
+  function openSoftEditForm(facet, personId, itemId) {
+    const slot = $("softEditSlot"); if (!slot) return
+    const OP = { driver: "edit_driver", need: "edit_need", asset: "edit_person_asset" }[facet]
+    const TYPEKEY = { driver: "driver_type", asset: "asset_type", need: null }[facet]
+    const list = { driver: PROFILE && PROFILE.drivers, need: PROFILE && PROFILE.needs, asset: PROFILE && PROFILE.person_assets }[facet] || []
+    const cur = itemId ? list.find((x) => x.id === itemId) : null
+
+    slot.innerHTML = ""
+    const title = document.createElement("p"); title.className = "col-head"
+    title.textContent = (cur ? "Edit " : "Add ") + facet
+    slot.appendChild(title)
+
+    const mk = (label, ph, val, tag) => {
+      const wrap = document.createElement("div"); wrap.style.marginTop = "6px"
+      const l = document.createElement("label"); l.textContent = label; l.style.fontSize = "11px"; wrap.appendChild(l)
+      const el = document.createElement(tag || "input")
+      if (tag === "textarea") el.rows = 2; else el.type = "text"
+      if (ph) el.placeholder = ph
+      if (val) el.value = val
+      wrap.appendChild(el); slot.appendChild(wrap); return el
+    }
+
+    const desc = mk("Text", facet + " description", (cur && cur.description) || "", "textarea")
+    const typeEl = TYPEKEY ? mk(
+      facet === "driver" ? "Driver type (optional)" : "Asset type (optional)",
+      facet === "asset" ? "qualification | experience | connection" : "e.g. mastery, autonomy",
+      (cur && cur[TYPEKEY]) || "") : null
+
+    // status: needs uses the need_status enum; drivers/assets are free text. dormant = retire.
+    const statusWrap = document.createElement("div"); statusWrap.style.marginTop = "6px"
+    const sl = document.createElement("label"); sl.textContent = "Status"; sl.style.fontSize = "11px"; statusWrap.appendChild(sl)
+    const statusEl = document.createElement("select")
+    const opts = facet === "need" ? ["latent", "active", "addressed", "dormant"] : ["active", "dormant"]
+    for (const o of opts) { const op = document.createElement("option"); op.value = o; op.textContent = o === "dormant" ? "dormant (retire)" : o; statusEl.appendChild(op) }
+    statusEl.value = (cur && opts.includes(cur.status)) ? cur.status : opts.includes("active") ? "active" : opts[0]
+    statusWrap.appendChild(statusEl); slot.appendChild(statusWrap)
+
+    // provenance: assert vs record. record reveals a "heard from" field.
+    const srcWrap = document.createElement("div"); srcWrap.style.marginTop = "8px"
+    srcWrap.innerHTML = '<label style="font-size:11px">Source</label>'
+    const modeSel = document.createElement("select")
+    for (const pair of [["assert", "I decided this (assert)"], ["record", "I heard it from someone (record)"]]) {
+      const op = document.createElement("option"); op.value = pair[0]; op.textContent = pair[1]; modeSel.appendChild(op)
+    }
+    srcWrap.appendChild(modeSel); slot.appendChild(srcWrap)
+    const heard = mk("Heard from", "who told you (name)", "")
+    heard.parentElement.style.display = "none"
+    modeSel.addEventListener("change", () => { heard.parentElement.style.display = modeSel.value === "record" ? "" : "none" })
+
+    const out = document.createElement("div"); out.className = "out"; out.style.marginTop = "8px"
+    const save = mkBtn(cur ? "Save edit" : "Add", "btn-accept", async () => {
+      const d = desc.value.trim(); if (!d) { show(out, "text required", false); return }
+      const mode = modeSel.value
+      if (mode === "record" && !heard.value.trim()) { show(out, "record needs 'heard from'", false); return }
+      const payload = { person_id: personId, description: d, status: statusEl.value, source_mode: mode }
+      if (itemId) payload.target_id = itemId
+      if (TYPEKEY && typeEl && typeEl.value.trim()) payload[TYPEKEY] = typeEl.value.trim()
+      if (mode === "record") payload.heard_from = heard.value.trim()
+      try {
+        const r = await api(OP, payload)
+        const msg = r.no_change ? "no change" : ((cur ? "edited" : "added") + (r.chained ? " · chained (anchor owed)" : "") + ". Refreshing…")
+        show(out, msg, true)
+        setTimeout(() => showProfile(personId), 600)
+      } catch (e) { show(out, e.message, false) }
+    })
+    save.style.marginTop = "10px"; slot.appendChild(save); slot.appendChild(out)
+    desc.focus()
   }
 
   // A compact "◉ profile" affordance appended to a result row. Its click must not
@@ -2175,6 +2280,7 @@
   $("refreshBtn").addEventListener("click", loadPending)
   // ── News tab (news-fit gate review) ─────────────────────────────────────
   let NEWS_STATE = "eligible"
+  let NEWS_SORT = "balanced"   // Day 127: relevance | newest | balanced (fit × freshness)
   // eligible = flowing (green); held = your manual set-aside (gold, wants attention);
   // parked = system auto set-aside (dim); validated (old rows) reads as flowing.
   const NEWS_STATE_COLOR = { held: "var(--gold)", eligible: "var(--green)", validated: "var(--green)", parked: "var(--ink-faint)" }
@@ -2182,7 +2288,7 @@
   async function loadNews() {
     const host = $("newsList"); host.textContent = "loading…"
     try {
-      const r = await api("list_news", { state: NEWS_STATE, limit: 100 })
+      const r = await api("list_news", { state: NEWS_STATE, sort: NEWS_SORT, limit: 100 })
       renderNews(r.news || [])
     } catch (e) { host.textContent = e.message }
   }
@@ -2190,7 +2296,39 @@
   function renderNews(items) {
     const host = $("newsList"); host.innerHTML = ""
     if (!items.length) { host.innerHTML = '<p class="hint">Nothing in this bucket.</p>'; return }
-    for (const it of items) host.appendChild(newsCard(it))
+    // Day 126 (feedback #2): a story that has already produced theses has flowed into
+    // the Theses feed — it's been acted on. Render it as one collapsed line (expandable)
+    // so the gate shows what still needs review, not what's already downstream.
+    // Day 127: also collapse a story the operator turned into a landscape thesis
+    // (has_thesis), a hypothesis-less path the count-based test misses — this is the
+    // fix for "I turn it into a thesis and it comes back next session with no marker".
+    for (const it of items) host.appendChild((it.hypothesis_count > 0 || it.has_thesis) ? newsCardCollapsed(it) : newsCard(it))
+  }
+
+  // One-line form of a news card: score · title · "N theses ›". Click to expand to the
+  // full card in place. Used for already-actioned stories and after "turn into thesis".
+  function newsCardCollapsed(it) {
+    const row = document.createElement("div")
+    row.style.cssText = "border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin-bottom:8px;display:flex;gap:10px;align-items:baseline;cursor:pointer;opacity:.7"
+    row.title = "Already in your Theses feed — click to expand"
+    const score = document.createElement("span")
+    score.style.cssText = "font-variant-numeric:tabular-nums;color:var(--ink-dim);font-size:12px"
+    score.textContent = (it.fit_score == null ? "—" : Number(it.fit_score).toFixed(3))
+    const title = document.createElement("span")
+    title.style.cssText = "font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+    title.textContent = it.title || "(untitled)"
+    const badge = document.createElement("span")
+    badge.style.cssText = "color:var(--green);font-size:12px;white-space:nowrap"
+    // Day 127: an operator "→ thesis" (has_thesis) is the explicit landscape action, so it
+    // leads the badge; else the resonator's per-person count. Either way the story is actioned.
+    badge.textContent = (it.has_thesis
+      ? "→ thesis"
+      : it.hypothesis_count
+        ? it.hypothesis_count + " thes" + (it.hypothesis_count === 1 ? "is" : "es")
+        : "in theses") + " ›"
+    row.append(score, title, badge)
+    row.onclick = () => row.replaceWith(newsCard(it))
+    return row
   }
 
   function newsCard(it) {
@@ -2224,13 +2362,16 @@
     // Per-item actions (Day 123): turn the story into a disposable theme thesis, or
     // analyze what it already touches. Independent of fit_state.
     const thBtn = document.createElement("button"); thBtn.className = "mini ghost"; thBtn.innerHTML = markSpan("inf_hollow", "mk-inf") + " thesis"
-    thBtn.title = "Turn into a landscape thesis in your Theses feed"; thBtn.onclick = () => newsToThesis(it.event_id, thBtn)
+    thBtn.title = "Turn into a landscape thesis in your Theses feed"; thBtn.onclick = () => newsToThesis(it, card, thBtn)
     const anBtn = document.createElement("button"); anBtn.className = "mini ghost"; anBtn.textContent = "⊙ analyze"
     anBtn.onclick = () => analyzeEvent(it.event_id, card)
     actions.append(thBtn, anBtn)
 
-    const slot = document.createElement("div"); slot.className = "news-analyze"; slot.style.marginTop = "8px"
-    card.append(head, title, summary, actions, slot)
+    // Analyze panel sits directly under the title (Day 126, feedback #1) so the
+    // analysis is the first thing read, not buried below summary + action buttons.
+    // Margin is applied only when open (see analyzeEvent) so an empty slot adds no gap.
+    const slot = document.createElement("div"); slot.className = "news-analyze"
+    card.append(head, title, slot, summary, actions)
     return card
   }
 
@@ -2239,13 +2380,28 @@
     catch (e) { alert(e.message) }
   }
 
+  // Day 126 #3: mark a story seen on explicit interaction (expand/analyze/turn-into-thesis),
+  // feeding the seen-penalty in the freshness ranking. Fire-and-forget — seen-state affects
+  // ordering, not correctness, so failures are ignored and never block the UI.
+  function markNewsSeen(eventId) {
+    try { api("mark_seen", { event_id: eventId }).catch(() => {}) } catch (_) {}
+  }
+
   // Turn a news item into a theme thesis in the Theses feed (server mints a hypothesis-less,
   // model-free suggestion). On success, point the operator to where to dispose it.
-  async function newsToThesis(eventId, btn) {
+  async function newsToThesis(it, card, btn) {
     btn.disabled = true; const prev = btn.innerHTML; btn.textContent = "…"
     try {
-      const r = await api("news_to_thesis", { event_id: eventId })
-      btn.textContent = "✓ in Theses"
+      const r = await api("news_to_thesis", { event_id: it.event_id })
+      markNewsSeen(it.event_id)   // Day 126 #3: turning into a thesis counts as seen
+      // Turned into a thesis → it's now in the Theses feed, so collapse the card to one
+      // line (feedback #2). Day 127: has_thesis now PERSISTS — v_news_review derives it
+      // from the news_to_thesis suggestion, so on reload the story stays collapsed with a
+      // "→ thesis" badge instead of re-surfacing untouched (the lost-signal / re-thesing
+      // bug). Set it locally too so the collapse is immediate this session.
+      it.has_thesis = true
+      if (card && card.parentNode) card.replaceWith(newsCardCollapsed(it))
+      else { btn.textContent = "✓ in Theses" }
       alert("Added to your Theses feed as a landscape sounding:\n\n“" + (r.claim || "") + "”\n\nOpen Theses to accept or reject it.")
     } catch (e) { btn.disabled = false; btn.innerHTML = prev; alert(e.message) }
   }
@@ -2254,8 +2410,9 @@
   // resonator generated from it (and who they're about) + its fit. No new guesses.
   async function analyzeEvent(eventId, card) {
     const slot = card.querySelector(".news-analyze")
-    if (slot.dataset.open === "1") { slot.innerHTML = ""; slot.dataset.open = "0"; return }
-    slot.dataset.open = "1"; slot.innerHTML = '<p class="hint">analyzing…</p>'
+    if (slot.dataset.open === "1") { slot.innerHTML = ""; slot.style.margin = ""; slot.dataset.open = "0"; return }
+    slot.dataset.open = "1"; slot.style.margin = "8px 0"; slot.innerHTML = '<p class="hint">analyzing…</p>'
+    markNewsSeen(eventId)   // Day 126 #3: expanding/analyzing counts as seen
     let r
     try { r = await api("analyze_event", { event_id: eventId }) }
     catch (e) { slot.innerHTML = '<p class="out err" style="display:block">' + esc(e.message) + "</p>"; return }
@@ -2285,6 +2442,17 @@
     }))
   }
 
+  // Day 127: sort toggle (replaces the refresh button — changing sort re-fetches anyway).
+  // relevance = fit only · newest = observed_at · balanced = fit × freshness (default).
+  function initNewsSortNav() {
+    const nav = $("newsSortNav"); if (!nav) return
+    nav.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+      NEWS_SORT = b.dataset.sort
+      nav.querySelectorAll("button").forEach((x) => x.classList.toggle("active", x === b))
+      loadNews()
+    }))
+  }
+
   $("navAdd").addEventListener("click", showAdd)
   $("navDispose").addEventListener("click", showDispose)
   $("navInitiatives").addEventListener("click", showInitiatives)
@@ -2295,8 +2463,8 @@
   $("tasksAll").addEventListener("change", loadTasks)
   $("navPropositions").addEventListener("click", showPropositions)
   $("navNews").addEventListener("click", showNews)
-  $("newsRefresh") && $("newsRefresh").addEventListener("click", loadNews)
   initNewsStateNav()
+  initNewsSortNav()
   $("propRefresh").addEventListener("click", loadPropositions)
   $("p_createBtn").addEventListener("click", createProposition)
   $("composeClose").addEventListener("click", closeCompose)
