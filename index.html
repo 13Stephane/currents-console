@@ -69,7 +69,7 @@
   /* §3.4 disposal surface — view nav + split-reader (Layout C) */
   .nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 26px; }
   .nav button { margin-top: 0; background: transparent; color: var(--ink-dim); border-color: var(--line); }
-  .nav button.active { border-color: var(--gold); color: var(--ink); }
+  .nav button.active { border-color: var(--gold); background: var(--gold); color: var(--bg); font-weight: 500; }
   body.wide .wrap { max-width: 1180px; }
   .split { display: grid; grid-template-columns: 312px minmax(0,1fr) 290px; gap: 18px; align-items: start; }
   @media (max-width: 940px) { .split { grid-template-columns: 1fr; } }
@@ -273,13 +273,14 @@
   </div>
 
   <div id="app" class="hidden">
+    <!-- Left-to-right = the review flow (News → Theses → Propositions → Tasks); the
+         create/act hub (Find/add, which now also declares initiatives) sits to the right. -->
     <div class="nav">
-      <button id="navAdd" class="active">Find / add</button>
-      <button id="navDispose">Theses</button>
-      <button id="navInitiatives">Initiatives</button>
+      <button id="navNews">News</button>
+      <button id="navDispose" class="active">Theses</button>
       <button id="navPropositions">Propositions</button>
       <button id="navTasks">Tasks</button>
-      <button id="navNews">News</button>
+      <button id="navAdd" style="margin-left:auto">Find / add</button>
     </div>
 
     <div id="addView">
@@ -396,26 +397,9 @@
       <p class="hint">Same-name twins routed for human disposal (§3.6). Never auto-merged.</p>
       <div id="pending" style="margin-top:10px"></div>
     </div>
-    </div><!-- /addView -->
-
-    <div id="disposeView" class="hidden">
-      <div id="reviewBanner" class="review-banner hidden"></div>
-      <div class="split">
-        <div class="col">
-          <div class="col-h">Pending <span id="sugCount"></span> <button class="ghost mini" id="dispRefresh" style="float:right;margin-top:-3px">refresh</button><label class="asset-filter" title="Show only proposals that name an asset to bring"><input type="checkbox" id="assetOnly"> ◈ asset-linked</label></div>
-          <div class="rail" id="rail"></div>
-        </div>
-        <div class="col detail" id="detail">
-          <p class="empty">Select a thesis to dispose.</p>
-        </div>
-        <div class="col">
-          <div class="col-h">Why · provenance</div>
-          <div id="evidence"><p class="empty">—</p></div>
-        </div>
-      </div>
-    </div><!-- /disposeView -->
-
-    <div id="initiativesView" class="hidden">
+    <!-- Initiatives (folded in Day 129): a top-down create/act surface. Was a standalone
+         nav tab; now one of the create surfaces in Find/add. Handlers (initiativeDryRun /
+         initiativeDispatch) are unchanged — they key on the same i_* ids. -->
     <div class="panel">
       <h2>Declare an initiative</h2>
       <p class="hint">A top-down theme dispatched as <em>individuated</em> fit-hypotheses — never a mail-merge. Currents embeds the intent, ranks people by how their current drivers/needs fit it, and composes one grounded fit-claim per person that rides the normal disposal feed. <strong>Step 1: dry-run</strong> to read the fit distribution and pick a floor from data. <strong>Step 2: dispatch</strong> at that floor.</p>
@@ -444,7 +428,38 @@
       <div class="out" id="i_live_out"></div>
       <div id="i_results" style="margin-top:10px"></div>
     </div>
-    </div><!-- /initiativesView -->
+
+    <!-- Active initiatives (Day 129): the "where do I see them once set" surface. A
+         dispatched initiative previously vanished from view — its only trace was the
+         theses it minted. list_initiatives reads triggers(kind='initiative') and each row
+         jumps to that initiative's theses in the Theses feed. -->
+    <div class="panel">
+      <h2>Active initiatives <button class="ghost mini" id="initListRefresh" style="margin-left:10px">load / refresh</button></h2>
+      <p class="hint">Themes you've dispatched. Each ranked people and minted one fit-thesis per person into your <strong>Theses</strong> feed — click a row to see those theses.</p>
+      <div id="initList" style="margin-top:10px"></div>
+    </div>
+    </div><!-- /addView -->
+
+    <div id="disposeView" class="hidden">
+      <div id="reviewBanner" class="review-banner hidden"></div>
+      <div id="sugFilter" class="hidden"></div>
+      <div class="split">
+        <div class="col">
+          <div class="col-h">Pending <span id="sugCount"></span> <button class="ghost mini" id="dispRefresh" style="float:right;margin-top:-3px">refresh</button><label class="asset-filter" title="Show only proposals that name an asset to bring"><input type="checkbox" id="assetOnly"> ◈ asset-linked</label></div>
+          <div class="rail" id="rail"></div>
+        </div>
+        <div class="col detail" id="detail">
+          <p class="empty">Select a thesis to dispose.</p>
+        </div>
+        <div class="col">
+          <div class="col-h">Why · provenance</div>
+          <div id="evidence"><p class="empty">—</p></div>
+        </div>
+      </div>
+    </div><!-- /disposeView -->
+
+    <!-- initiativesView removed — the initiative compose/dispatch panels moved into
+         Find/add (addView), where all create/act surfaces now live. -->
 
     <div id="tasksView" class="hidden">
     <div class="panel">
@@ -452,6 +467,11 @@
         <label class="asset-filter" style="float:right" title="Include completed/abandoned"><input type="checkbox" id="tasksAll"> show resolved</label>
       </h2>
       <p class="hint">Your commitments — a task is spawned when you accept or edit a suggestion. <strong>Complete</strong> / <strong>Abandon</strong> is the outcome signal the loop grades against; <strong>Stall</strong> parks it. Unfiled tasks sit under <strong>Unassigned</strong>.</p>
+      <div class="nav" id="taskSortNav" style="margin-bottom:12px;align-items:center">
+        <span class="hint" style="margin:0 8px 0 0">order</span>
+        <button data-tsort="recent" class="active" title="Most recently updated first (grouped by proposition)">Recent</button>
+        <button data-tsort="donext" title="What to work on next: horizon (now → later), open before stalled, older rises. One cross-proposition list.">Do next</button>
+      </div>
       <div id="tasksList" style="margin-top:12px"></div>
     </div>
     </div><!-- /tasksView -->
@@ -459,7 +479,7 @@
     <div id="newsView" class="hidden">
     <div class="panel">
       <h2>News</h2>
-      <p class="hint">The news-fit gate. Every story is scored against your positioning <em>before</em> the resonator turns it into theses. <strong>Eligible</strong> = flowing (default). <strong>Parked</strong> = the system's auto set-aside for low-fit (muted, expires from view). <strong>Held</strong> = <em>your</em> manual set-aside. <strong>Validate</strong> promotes a parked/held story back into flow; <strong>Hold</strong> / <strong>Park</strong> set one aside. Per item you can also <strong>turn it into a thesis</strong> (a landscape sounding to dispose) or <strong>analyze</strong> what it already touches. Model proposes, you dispose — no calibration signal is written here.</p>
+      <p class="hint">The news-fit <strong>gate</strong> — the precision filter that runs <em>before</em> the resonator turns a story into theses, so nothing here writes a calibration signal (model proposes, you dispose). <strong>Eligible</strong> = flowing (the default). <strong>Parked</strong> = low-fit set-aside: the system parks these <em>automatically</em>, they <em>expire</em> from view after 14 days and train the scorer (also where <strong>Park</strong> mutes one yourself). <strong>Held</strong> = <em>your</em> manual shelf: never auto-set, never expires, kept to revisit. <strong>Validate</strong> promotes a parked/held story back into flow. Per item you can <strong>turn it into a thesis</strong> (a landscape sounding for your Theses feed) or <strong>analyze</strong> what it already touches. <span style="color:var(--ink-faint)">— vs the <strong>Theses</strong> feed, where disposing <em>does</em> write calibration: that's the ground truth, this is the gate.</span></p>
       <div class="nav" id="newsStateNav" style="margin-bottom:10px">
         <button data-state="eligible" class="active">Eligible</button>
         <button data-state="held">Held</button>
@@ -799,18 +819,24 @@
   let SUGS = [], SELID = null
 
   function setNav(active) {
-    for (const id of ["navAdd", "navDispose", "navInitiatives", "navPropositions", "navTasks", "navNews"]) $(id).classList.toggle("active", id === active)
+    for (const id of ["navAdd", "navDispose", "navPropositions", "navTasks", "navNews"]) $(id).classList.toggle("active", id === active)
     $("addView").classList.toggle("hidden", active !== "navAdd")
     $("disposeView").classList.toggle("hidden", active !== "navDispose")
-    $("initiativesView").classList.toggle("hidden", active !== "navInitiatives")
     $("propositionsView").classList.toggle("hidden", active !== "navPropositions")
     $("tasksView").classList.toggle("hidden", active !== "navTasks")
     $("newsView").classList.toggle("hidden", active !== "navNews")
     document.body.classList.toggle("wide", active === "navDispose")
   }
   function showAdd() { setNav("navAdd"); $("rm_q").focus() }
-  function showDispose() { setNav("navDispose"); loadSuggestions() }
-  function showInitiatives() { setNav("navInitiatives"); $("i_intent").focus() }
+  // Day 129: the Theses feed can be filtered to one initiative's theses (from Active initiatives).
+  // Clicking the Theses NAV tab clears any filter (full feed); the initiative row sets it.
+  let SUG_TRIGGER = null, SUG_TRIGGER_TITLE = null
+  function showDispose() { SUG_TRIGGER = null; SUG_TRIGGER_TITLE = null; setNav("navDispose"); loadSuggestions() }
+  function showDisposeForInitiative(triggerId, title) {
+    SUG_TRIGGER = triggerId || null; SUG_TRIGGER_TITLE = title || null
+    setNav("navDispose"); loadSuggestions()
+  }
+  function clearSugFilter() { SUG_TRIGGER = null; SUG_TRIGGER_TITLE = null; loadSuggestions() }
   function showPropositions() { setNav("navPropositions"); loadPropositions() }
   function showTasks() { setNav("navTasks"); loadTasks() }
   function showNews() { setNav("navNews"); loadNews() }
@@ -957,7 +983,7 @@
 
   async function loadSuggestions() {
     try {
-      const r = await api("list_suggestions", {})
+      const r = await api("list_suggestions", SUG_TRIGGER ? { trigger_id: SUG_TRIGGER } : {})
       SUGS = r.suggestions || []
       renderRail()
       if (SELID && SUGS.some((s) => s.id === SELID)) selectSug(SELID)
@@ -1329,8 +1355,24 @@
     }
   }
 
+  // Day 129: the initiative-filter banner — shows which initiative the feed is scoped to, with
+  // a one-click clear back to the full feed. Hidden when no filter is active.
+  function renderSugFilter() {
+    const el = $("sugFilter"); if (!el) return
+    if (!SUG_TRIGGER) { el.className = "hidden"; el.innerHTML = ""; return }
+    el.className = ""
+    el.style.cssText = "margin-bottom:12px;padding:8px 12px;border:1px solid var(--gold);border-radius:6px;font-size:13px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"
+    el.innerHTML = ""
+    const label = document.createElement("span"); label.style.color = "var(--ink-dim)"
+    label.innerHTML = '<span style="color:var(--gold)">◆ initiative</span> ' + esc(SUG_TRIGGER_TITLE || "(initiative)") + ' — showing only its theses'
+    const btn = document.createElement("button"); btn.className = "ghost mini"; btn.textContent = "clear filter"
+    btn.onclick = clearSugFilter
+    el.append(label, btn)
+  }
+
   function renderRail() {
     renderReviewBanner()
+    renderSugFilter()
     const assetOnly = $("assetOnly") && $("assetOnly").checked
     const view = assetOnly ? SUGS.filter((s) => s.asset) : SUGS
     $("sugCount").textContent = assetOnly ? "· " + view.length + " / " + SUGS.length : "· " + SUGS.length
@@ -1784,6 +1826,45 @@
     }
   }
 
+  // ---- Active initiatives (Day 129): the "where do I see them once set" surface ----
+  // A dispatched initiative used to leave no standing trace beyond the theses it minted.
+  // list_initiatives reads triggers(kind='initiative') with fire/thesis counts; a row jumps
+  // to the Theses feed. Degrades gracefully if the op isn't deployed yet (pending console deploy).
+  async function loadInitiatives() {
+    const host = $("initList"); host.innerHTML = '<p class="hint">loading…</p>'
+    let r
+    try { r = await api("list_initiatives", {}) }
+    catch (e) {
+      host.innerHTML = ""
+      const p = document.createElement("p"); p.className = "hint"
+      p.textContent = /404|not.?found|unknown op/i.test(e.message || "")
+        ? "list_initiatives isn't deployed yet — ships with the pending console deploy."
+        : ("couldn't load: " + e.message)
+      host.appendChild(p); return
+    }
+    const items = (r && r.initiatives) || []
+    host.innerHTML = ""
+    if (!items.length) { host.innerHTML = '<p class="hint">No initiatives dispatched yet.</p>'; return }
+    for (const it of items) {
+      const item = document.createElement("div"); item.className = "search-hit"
+      item.style.cursor = "pointer"
+      const nm = document.createElement("div"); nm.className = "sh-name"
+      nm.textContent = (it.is_active === false ? "◌ inactive · " : "") + (it.title || "(untitled)")
+      item.appendChild(nm)
+      const meta = document.createElement("div"); meta.className = "sh-meta"
+      const bits = []
+      if (it.pending_count != null) bits.push(it.pending_count + " pending")
+      if (it.thesis_count != null) bits.push(it.thesis_count + " thes" + (it.thesis_count === 1 ? "is" : "es"))
+      if (it.fire_count != null) bits.push("fired " + it.fire_count + "×")
+      if (it.last_fired) bits.push("last " + String(it.last_fired).slice(0, 10))
+      meta.textContent = (it.intent ? it.intent.slice(0, 90) + " · " : "") + bits.join(" · ") + "   ▸ theses"
+      item.appendChild(meta)
+      // Jump to the Theses feed filtered to THIS initiative's theses (clearable there).
+      item.addEventListener("click", () => showDisposeForInitiative(it.trigger_id, it.title))
+      host.appendChild(item)
+    }
+  }
+
   // ---- Tasks (Day 110): surface + close the work spawned by accepted propositions ----
   // Build 2's list_tasks/update_task ops had no UI. A status change (complete/abandon/stall)
   // writes a chained feedback_event (the grade-3 outcome signal); a pure action-text amend writes none.
@@ -1800,11 +1881,26 @@
         api("list_propositions", {}).catch(() => ({ propositions: [] })),
       ])
       TASK_PROPS = pr.propositions || []
-      renderTasks(r.tasks || [])
+      TASKS_CACHE = r.tasks || []
+      renderTasks(TASKS_CACHE)
     } catch (e) { host.textContent = e.message }
   }
 
   const TASK_STATUS_COLOR = { open: "var(--gold)", stalled: "var(--ink-dim)", completed: "var(--green)", abandoned: "var(--reject)" }
+
+  // Day 129 (item #5): "Do next" prioritization. Recent = the Day-120 grouped view (updated_at).
+  // Do next = one cross-proposition list ranked by a transparent composite: horizon is the
+  // operator's own lever (now>next>later), open outranks stalled, and an open task gains urgency
+  // as it ages. v1 uses only signals on the task itself; expiring-thesis / stakeholder-stage /
+  // fit are the tunable next layer (they need a list_tasks join — held for a server pass).
+  let TASK_SORT = "recent", TASKS_CACHE = []
+  const HORIZON_RANK = { now: 3, next: 2, later: 1 }
+  function doNextScore(t) {
+    const h = HORIZON_RANK[t.horizon] ?? 1.5              // unset sits between next and later
+    const statusMult = t.status === "stalled" ? 0.5 : 1  // stalled is parked — sinks but stays visible
+    const ageDays = t.created_at ? Math.max(0, (Date.now() - new Date(t.created_at).getTime()) / 86400000) : 0
+    return h * statusMult + Math.min(ageDays / 14, 1)     // up to +1 as an open task ages toward 2 weeks
+  }
 
   // Day 120: group by proposition membership. Standalone tasks (proposition_id null) are
   // legitimate one-off work, but were invisible/unattachable — surface them as "Unassigned"
@@ -1812,6 +1908,13 @@
   function renderTasks(tasks) {
     const host = $("tasksList"); host.innerHTML = ""
     if (!tasks.length) { host.innerHTML = '<p class="hint">No tasks. Accept or edit a suggestion in Dispose to spawn one.</p>'; return }
+    if (TASK_SORT === "donext") {
+      const ranked = tasks.slice().sort((a, b) => doNextScore(b) - doNextScore(a))
+      host.appendChild(taskGroupHeader("Do next · " + ranked.length,
+        "One ranked list across every proposition: horizon (now → later), open before stalled, older work rising. Set a task's horizon on the Propositions board to move it up."))
+      for (const t of ranked) host.appendChild(taskCard(t))
+      return
+    }
     const unassigned = tasks.filter((t) => !t.proposition_id)
     const assigned = tasks.filter((t) => t.proposition_id)
     if (unassigned.length) {
@@ -1848,7 +1951,9 @@
     const meta = document.createElement("div"); meta.className = "hint"; meta.style.marginTop = "5px"
     const age = t.created_at ? Math.max(0, Math.round((Date.now() - new Date(t.created_at).getTime()) / 86400000)) : null
     const pill = '<span style="color:' + (TASK_STATUS_COLOR[t.status] || "var(--ink-dim)") + ';font-weight:600">● ' + t.status + '</span>'
-    meta.innerHTML = pill + (subjectHTML ? " · " + subjectHTML : "")
+    meta.innerHTML = pill
+      + (t.horizon ? ' · <span style="color:var(--ink-dim)">▷ ' + t.horizon + "</span>" : "")
+      + (subjectHTML ? " · " + subjectHTML : "")
       + (t.proposition_name ? ' · <span style="color:var(--gold)">◆ ' + esc(t.proposition_name) + "</span>" : "")
       + (t.created_from ? " · from " + esc(t.created_from) : "")
       + (age !== null ? " · " + (age === 0 ? "today" : age + "d ago") : "")
@@ -2284,6 +2389,12 @@
   // eligible = flowing (green); held = your manual set-aside (gold, wants attention);
   // parked = system auto set-aside (dim); validated (old rows) reads as flowing.
   const NEWS_STATE_COLOR = { held: "var(--gold)", eligible: "var(--green)", validated: "var(--green)", parked: "var(--ink-faint)" }
+  const NEWS_STATE_TIP = {
+    held: "Your manual shelf — never auto-set, never expires. Kept to revisit.",
+    eligible: "Flowing to the resonator (the default).",
+    validated: "You promoted this back into flow.",
+    parked: "Low-fit set-aside — auto-parked by the scorer or muted by you; expires from view after 14 days and trains the scorer."
+  }
 
   async function loadNews() {
     const host = $("newsList"); host.textContent = "loading…"
@@ -2340,8 +2451,9 @@
     score.style.cssText = "font-variant-numeric:tabular-nums;color:var(--ink-dim)"
     score.textContent = (it.fit_score == null ? "—" : Number(it.fit_score).toFixed(3))
     const st = document.createElement("span"); st.textContent = it.fit_state
+    st.title = NEWS_STATE_TIP[it.fit_state] || ""
     const col = NEWS_STATE_COLOR[it.fit_state] || "var(--ink-dim)"
-    st.style.cssText = "font-size:12px;padding:1px 8px;border:1px solid " + col + ";color:" + col + ";border-radius:10px"
+    st.style.cssText = "font-size:12px;padding:1px 8px;border:1px solid " + col + ";color:" + col + ";border-radius:10px;cursor:help"
     const meta = document.createElement("span"); meta.style.cssText = "color:var(--ink-dim);font-size:12px"
     meta.textContent = (it.source_kind || "news") + " · " + (it.observed_at || "").slice(0, 10) + (it.hypothesis_count ? " · " + it.hypothesis_count + " theses" : "")
     head.append(score, st, meta)
@@ -2371,13 +2483,53 @@
     // analysis is the first thing read, not buried below summary + action buttons.
     // Margin is applied only when open (see analyzeEvent) so an empty slot adds no gap.
     const slot = document.createElement("div"); slot.className = "news-analyze"
-    card.append(head, title, slot, summary, actions)
+    // Day 129 (News #4): the one-line "so what?" — rendered when cached, else lazily generated
+    // when the card scrolls into view (true on-demand + cache). Sits under the analyze slot,
+    // above the publisher blurb, so the implication reads before the raw feed summary.
+    const sw = document.createElement("div")
+    if (it.so_what) {
+      sw.style.cssText = "color:var(--gold);font-size:13px;font-style:italic;margin:2px 0 8px"
+      sw.textContent = "So what — " + it.so_what
+    } else {
+      sw.style.cssText = "color:var(--ink-faint);font-size:13px;font-style:italic;margin:2px 0 8px"
+      sw.textContent = "So what — …"
+      card.__news = it; card.__swline = sw
+      const obs = soWhatObserver(); if (obs) obs.observe(card); else ensureSoWhat(it, sw)
+    }
+    card.append(head, title, slot, sw, summary, actions)
     return card
   }
 
   async function disposeNews(eventId, action) {
     try { await api("news_dispose", { event_id: eventId, action }); loadNews() }
     catch (e) { alert(e.message) }
+  }
+
+  // Day 129 (News #4): lazily fill the "so what?" line when a card enters the viewport — only
+  // stories actually looked at get generated (on-demand), and each is cached server-side on
+  // world_event_fit so it never regenerates. Degrades silently pre-deploy (op 404 → line hidden).
+  let SOWHAT_OBS = null
+  function soWhatObserver() {
+    if (SOWHAT_OBS) return SOWHAT_OBS
+    if (!("IntersectionObserver" in window)) return null
+    SOWHAT_OBS = new IntersectionObserver((entries, obs) => {
+      for (const en of entries) {
+        if (!en.isIntersecting) continue
+        obs.unobserve(en.target)
+        ensureSoWhat(en.target.__news, en.target.__swline)
+      }
+    }, { rootMargin: "150px" })
+    return SOWHAT_OBS
+  }
+  async function ensureSoWhat(it, line) {
+    if (!it || !line || it.so_what || it._sw_loading) return
+    it._sw_loading = true
+    try {
+      const r = await api("news_so_what", { event_id: it.event_id })
+      if (r && r.so_what) { it.so_what = r.so_what; line.textContent = "So what — " + r.so_what; line.style.color = "var(--gold)" }
+      else line.style.display = "none"
+    } catch (_) { line.style.display = "none" }   // pre-deploy 404 / transient — no nag
+    finally { it._sw_loading = false }
   }
 
   // Day 126 #3: mark a story seen on explicit interaction (expand/analyze/turn-into-thesis),
@@ -2455,12 +2607,18 @@
 
   $("navAdd").addEventListener("click", showAdd)
   $("navDispose").addEventListener("click", showDispose)
-  $("navInitiatives").addEventListener("click", showInitiatives)
   $("i_dryBtn").addEventListener("click", initiativeDryRun)
   $("i_liveBtn").addEventListener("click", initiativeDispatch)
+  $("initListRefresh").addEventListener("click", loadInitiatives)
   $("navTasks").addEventListener("click", showTasks)
   $("tasksRefresh").addEventListener("click", loadTasks)
   $("tasksAll").addEventListener("change", loadTasks)
+  // Day 129 (#5): Tasks "Recent" vs "Do next" ordering — re-renders from cache, no refetch.
+  $("taskSortNav").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+    TASK_SORT = b.dataset.tsort
+    $("taskSortNav").querySelectorAll("button").forEach((x) => x.classList.toggle("active", x === b))
+    renderTasks(TASKS_CACHE)
+  }))
   $("navPropositions").addEventListener("click", showPropositions)
   $("navNews").addEventListener("click", showNews)
   initNewsStateNav()
