@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Currents · Confirm action</title>
+<!--
+  Day 133 — email action confirm surface.
+
+  WHY THIS PAGE EXISTS. The Supabase gateway rewrites every edge-function response to
+  Content-Type: text/plain with nosniff (anti-phishing on the shared *.supabase.co
+  domain). So the confirm page email-action renders server-side arrives in the browser as
+  unrendered HTML source, with no clickable button. Measured live 2026-08-05: 80 action
+  tokens issued in 7 days, zero email-channel disposals since 2026-06-30.
+
+  GitHub Pages serves real text/html, so the confirm UI is rendered HERE and email-action
+  is driven as a JSON API (?format=json).
+
+  PREFETCH SAFETY is unchanged and still the core constraint. Gmail and security scanners
+  GET every link in a message. This page is static and mutates nothing; the GET it issues
+  is read-only; the disposal happens only on a POST fired by a deliberate click.
+
+  No external requests: Georgia is a system font, and nothing is loaded cross-origin
+  except the endpoint itself.
+-->
+<style>
+  :root {
+    --ink: #1d1b16;
+    --muted: #6b6557;
+    --gold: #9a6a00;
+    --rule: #e6e1d6;
+    --bg: #f0ede4;
+    --card: #fffefb;
+    --err: #a32d2d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: Georgia, 'Times New Roman', serif;
+    display: flex;
+    justify-content: center;
+    padding: 40px 16px;
+    min-height: 100vh;
+  }
+  .card {
+    width: 100%;
+    max-width: 540px;
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 30px 34px;
+    height: fit-content;
+  }
+  .brand {
+    font-size: 12px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--gold);
+  }
+  .headline {
+    font-size: 21px;
+    font-weight: bold;
+    padding-top: 8px;
+    line-height: 1.3;
+  }
+  p { font-size: 15px; color: var(--muted); line-height: 1.5; }
+  .lede { padding-top: 14px; }
+  .done { font-size: 16px; color: var(--gold); font-weight: bold; padding-top: 16px; }
+  .error { color: var(--err); }
+  .fine { font-size: 12px; padding-top: 18px; }
+  textarea {
+    font-family: inherit;
+    font-size: 14px;
+    width: 100%;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 10px;
+    color: var(--ink);
+    background: var(--card);
+    margin: 16px 0 4px;
+    resize: vertical;
+  }
+  button {
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: bold;
+    color: #fff;
+    background: var(--gold);
+    border: none;
+    border-radius: 6px;
+    padding: 12px 26px;
+    cursor: pointer;
+    margin-top: 20px;
+  }
+  button[disabled] { opacity: .55; cursor: default; }
+  a.console {
+    display: inline-block;
+    margin-top: 18px;
+    font-size: 14px;
+    color: var(--gold);
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand">Currents</div>
+  <div id="slot"><p class="lede">Loading…</p></div>
+</div>
+
+<script>
+const ENDPOINT = "https://axgxmsbfjetzcnwosvpl.supabase.co/functions/v1/email-action";
+const CONSOLE_HREF = "./index.html";
+
+const slot = document.getElementById("slot");
+const token = new URLSearchParams(location.search).get("t") || "";
+
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+const consoleLink = `<a class="console" href="${CONSOLE_HREF}">Open the review console →</a>`;
+
+function fail(msg) {
+  slot.innerHTML = `<div class="headline">Can't complete that</div>` +
+    `<p class="lede error">${esc(msg)}</p>` + consoleLink;
+}
+
+function url() {
+  return `${ENDPOINT}?t=${encodeURIComponent(token)}&format=json`;
+}
+
+// GET — read-only. Renders the confirm UI; never mutates.
+async function load() {
+  if (!token) return fail("This link is missing its token.");
+  let data;
+  try {
+    const res = await fetch(url(), { method: "GET" });
+    data = await res.json();
+  } catch (e) {
+    return fail("Couldn't reach Currents. Check your connection and reload.");
+  }
+  if (!data.ok) return fail(data.message || "This link is no longer valid.");
+  if (data.blocked) {
+    slot.innerHTML = `<div class="headline">${esc(data.suggested_action)}</div>` +
+      `<p class="lede">${esc(data.blocked_note)}</p>` + consoleLink;
+    return;
+  }
+  render(data);
+}
+
+function render(data) {
+  const intro = data.is_acted
+    ? `<p class="lede">Optional — paste what you actually sent for an exact record. Leave blank to record the proposed draft.</p>`
+    : `<p class="lede">Confirm you want to <b>${esc(String(data.label).toLowerCase())}</b> this suggestion.</p>`;
+  const box = data.is_acted
+    ? `<textarea id="sent" rows="6" placeholder="Paste your sent message (optional)…"></textarea>`
+    : "";
+  slot.innerHTML =
+    `<div class="headline">${esc(data.suggested_action)}</div>` +
+    intro + box +
+    `<button id="go">Confirm ${esc(data.label)}</button>` +
+    `<p class="fine">This link is single-use and tied to one suggestion.</p>`;
+  document.getElementById("go").addEventListener("click", () => submit(data));
+}
+
+// POST — the mutation, and only from this deliberate click.
+async function submit(data) {
+  const btn = document.getElementById("go");
+  btn.disabled = true;
+  btn.textContent = "Recording…";
+
+  const body = new URLSearchParams();
+  const sent = document.getElementById("sent");
+  if (sent && sent.value.trim()) body.set("sent_text", sent.value.trim());
+
+  let out;
+  try {
+    const res = await fetch(url(), {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body.toString(),
+    });
+    out = await res.json();
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = `Confirm ${data.label}`;
+    return fail("Couldn't reach Currents. Nothing was recorded — reload to retry.");
+  }
+
+  if (!out.ok) {
+    slot.innerHTML = `<div class="headline">${esc(data.suggested_action)}</div>` +
+      `<p class="lede${out.result === "error" ? " error" : ""}">${esc(out.message)}</p>` + consoleLink;
+    return;
+  }
+
+  slot.innerHTML =
+    `<div class="headline">${esc(out.suggested_action)}</div>` +
+    `<p class="done">✓ ${esc(out.headline)}</p>` +
+    `<p style="font-size:13px;padding-top:8px;">${esc(out.message)} You can close this tab.</p>` +
+    consoleLink;
+}
+
+load();
+</script>
+</body>
+</html>
