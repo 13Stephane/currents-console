@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Currents · Loops · calibration workbench</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,400&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:rgb(25,60,63); --ink:rgb(244,240,233); --ink-dim:rgba(244,240,233,.62); --ink-faint:rgba(244,240,233,.35);
+  --gold:rgb(198,165,83); --line:rgba(244,240,233,.14);
+  --green:rgb(126,166,120); --amber:rgb(212,158,86); --grey:rgba(244,240,233,.35);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--ink);font-family:'Fraunces',Georgia,serif;font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.page{max-width:1080px;margin:0 auto;padding:36px 40px 100px}
+.eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-bottom:8px}
+h1{font-weight:400;font-size:34px;letter-spacing:-.02em;margin-bottom:4px}
+h1 em{font-style:italic;color:var(--gold);font-weight:300}
+.sub{font-style:italic;color:var(--ink-dim);font-size:15px;margin-bottom:28px}
+/* gate */
+.gate{display:flex;gap:12px;align-items:flex-end;border:1px solid var(--line);padding:22px 24px;margin-bottom:28px;background:rgba(244,240,233,.02)}
+.gate>div{flex:1}
+.gate label{display:block;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:6px}
+.gate input{width:100%;background:rgba(244,240,233,.04);border:1px solid var(--line);color:var(--ink);padding:10px 12px;font-family:'IBM Plex Mono',monospace;font-size:13px}
+.gate input:focus{outline:none;border-color:var(--gold)}
+.gate button,.btn{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);border:1px solid var(--gold);background:none;padding:10px 18px;cursor:pointer}
+.gate button:focus-visible,.btn:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.ghost{color:var(--ink-dim);border-color:var(--line)}
+.hint{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-faint);margin-top:10px}
+.err{color:var(--amber)}
+.hidden{display:none}
+/* vitals */
+.vitals{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--line);border:1px solid var(--line);margin-bottom:14px}
+.vital{background:var(--bg);padding:16px 18px}
+.vital .k{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:6px}
+.vital .v{font-size:24px;font-weight:400}
+.vital .v small{font-size:12px;color:var(--ink-dim);font-style:italic}
+.vital.alarm .v{color:var(--amber)}
+.sparkwrap{margin-bottom:30px}
+.sparkwrap .k{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:6px}
+/* tabs */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--line);margin-bottom:28px;flex-wrap:wrap}
+.tab{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-dim);background:none;border:none;padding:12px 18px;cursor:pointer;border-bottom:2px solid transparent}
+.tab:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+.tab[aria-selected="true"]{color:var(--gold);border-bottom-color:var(--gold)}
+.panel{display:none}.panel.on{display:block}
+h2{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);margin:6px 0 16px}
+.note{font-size:13px;color:var(--ink-dim);font-style:italic;margin-bottom:18px;max-width:74ch}
+/* pills / tags */
+.pill{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:2px 8px;border:1px solid}
+.pill.green{color:var(--green);border-color:var(--green)}
+.pill.amber{color:var(--amber);border-color:var(--amber)}
+.pill.grey{color:var(--grey);border-color:var(--grey)}
+.tag{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink-faint);letter-spacing:.08em}
+/* table */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);text-align:left;padding:10px 10px;border-bottom:1px solid var(--gold);font-weight:500}
+td{padding:11px 10px;border-bottom:1px solid var(--line);vertical-align:baseline}
+td.mono,.mono{font-family:'IBM Plex Mono',monospace;font-size:12.5px}
+td.dim{color:var(--ink-dim)}
+tr.click{cursor:pointer}
+tr.click:hover td{background:rgba(244,240,233,.03)}
+tr.sel td{background:rgba(198,165,83,.06)}
+.debt{color:var(--amber)}
+/* reliability */
+.rel-grid{display:grid;grid-template-columns:460px 1fr;gap:36px;align-items:start}
+.metric-row{display:flex;gap:28px;flex-wrap:wrap;margin-bottom:20px}
+.metric .k{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px}
+.metric .v{font-size:22px}
+.metric .v.gold{color:var(--gold)}
+.raw{font-family:'IBM Plex Mono',monospace;color:var(--ink-dim)}
+.decomp{margin-top:8px}
+.dbar{display:grid;grid-template-columns:120px 1fr 60px;gap:12px;align-items:center;margin-bottom:10px;font-size:12.5px}
+.dbar .lbl{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-dim)}
+.dbar .track{height:6px;background:rgba(244,240,233,.07)}
+.dbar .fill{height:6px;background:var(--gold)}
+.identity{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-faint);margin-top:14px}
+.toggle{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-dim);border:1px solid var(--line);background:none;padding:6px 12px;cursor:pointer;margin-bottom:14px}
+.toggle[aria-pressed="true"]{border-color:var(--gold);color:var(--gold)}
+.toggle:focus-visible{outline:2px solid var(--gold)}
+/* floor strip */
+.strip-wrap{margin:26px 0 10px;position:relative;height:120px}
+.strip{position:absolute;top:60px;left:0;right:0;height:2px;background:var(--line)}
+.marker{position:absolute;top:40px;width:2px;height:42px}
+.marker .lab{position:absolute;top:-32px;left:-4px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;white-space:nowrap}
+.marker .val{position:absolute;top:46px;left:-8px;font-family:'IBM Plex Mono',monospace;font-size:11px}
+.m-cur{background:var(--ink-dim)} .m-cur .lab,.m-cur .val{color:var(--ink-dim)}
+.m-rev{background:var(--amber)} .m-rev .lab,.m-rev .val{color:var(--amber)}
+.m-act{background:var(--gold)} .m-act .lab,.m-act .val{color:var(--gold)}
+.m-act .lab{top:-46px}
+.dashed{background:repeating-linear-gradient(to bottom,var(--gold) 0 4px,transparent 4px 8px)}
+.proposal{background:rgba(244,240,233,.03);border-left:2px solid var(--gold);padding:16px 20px;margin-top:26px}
+.proposal .plabel{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);margin-bottom:10px}
+pre{font-family:'IBM Plex Mono',monospace;font-size:11.5px;line-height:1.6;color:var(--ink-dim);overflow-x:auto;white-space:pre-wrap}
+/* overrides */
+.score-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);margin-bottom:24px}
+.score{background:var(--bg);padding:20px}
+.score .big{font-size:34px;color:var(--gold)}
+.score .k{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:8px}
+.locked{border:1px dashed var(--line);padding:14px 18px;color:var(--ink-faint);font-style:italic;font-size:14px}
+/* empty */
+.empty{border:1px dashed var(--line);padding:26px;color:var(--ink-faint);font-style:italic;font-size:14px;max-width:64ch}
+.wm{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--amber);margin-bottom:10px}
+.chip{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;border:1px solid var(--line);color:var(--ink-dim);padding:5px 12px;background:none;cursor:pointer;margin-bottom:16px}
+.chip[aria-pressed="true"]{border-color:var(--gold);color:var(--gold)}
+.foot{margin-top:70px;padding-top:20px;border-top:1px solid var(--line);font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:var(--ink-faint);line-height:1.7}
+@media(max-width:900px){.rel-grid{grid-template-columns:1fr}.vitals{grid-template-columns:1fr 1fr}.score-grid{grid-template-columns:1fr}.page{padding:24px 18px 80px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="eyebrow">Currents · learning loops</div>
+<h1>Loops <em>— keep score</em></h1>
+<p class="sub">Every claim resolved or visibly in debt. Every threshold justified. Every override scored against the rule it overrode.</p>
+
+<!-- token gate -->
+<div class="gate" id="gate">
+  <div>
+    <label for="token">loops token</label>
+    <input id="token" type="password" autocomplete="off" placeholder="x-loops-token">
+    <div class="hint" id="gate-hint">Read-only workbench. Token stays in this tab's session storage.</div>
+  </div>
+  <button id="unlock" type="button">Unlock</button>
+</div>
+
+<div id="app" class="hidden">
+  <div class="vitals" id="vitals"></div>
+  <div class="sparkwrap"><div class="k">disposal / brief · trailing 14d</div><div id="spark"></div></div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true" data-p="ledger">Ledger</button>
+    <button class="tab" role="tab" aria-selected="false" data-p="reliability">Reliability</button>
+    <button class="tab" role="tab" aria-selected="false" data-p="floor">Floor</button>
+    <button class="tab" role="tab" aria-selected="false" data-p="overrides">Overrides</button>
+    <button class="tab" role="tab" aria-selected="false" data-p="lessons">Lessons</button>
+  </div>
+
+  <section class="panel on" id="ledger">
+    <h2>Ledger · one row per reference class</h2>
+    <p class="note">class = (target kind · origin · generator). Sorted by open debt — a forecast without resolution is not a forecast. Row click filters Reliability, Floor and Overrides.</p>
+    <div id="ledger-body"></div>
+  </section>
+
+  <section class="panel" id="reliability">
+    <h2 id="rel-h">Reliability</h2>
+    <p class="note">Predicted confidence vs empirical frequency, Wilson 95% bars, point area ∝ n. Raw model values are internal (mono-dim); empirical values in gold. Region below the diagonal is overconfidence.</p>
+    <div id="rel-body"></div>
+  </section>
+
+  <section class="panel" id="floor">
+    <h2 id="floor-h">Floor</h2>
+    <p class="note">Three floors on one strip. Divergence is the signal: current ≪ actuarial leaks weak surfacings; current ≫ revealed starves the loop against the user's own bar. Nothing here is applied — the proposal is copied and applied through the normal config path.</p>
+    <div id="floor-body"></div>
+  </section>
+
+  <section class="panel" id="overrides">
+    <h2 id="ov-h">Overrides · clinical vs actuarial</h2>
+    <p class="note">Disposals that contradicted the rule. World-resolvable claims only enter the scoreboard; censored ones are listed unscored.</p>
+    <div id="ov-body"></div>
+  </section>
+
+  <section class="panel" id="lessons">
+    <h2 id="les-h">Lessons · promotion tracker</h2>
+    <p class="note">A learning counts only when something runs it automatically. Everything else is documentation.</p>
+    <button class="chip" id="tacit-filter" type="button" aria-pressed="false">Filter · tacit only</button>
+    <div id="les-body"></div>
+  </section>
+
+  <div class="foot" id="foot">Currents · Loops · calibration workbench · live · reads gate writes; the live schema wins</div>
+</div>
+
+</div>
+<script>
+const API = "https://axgxmsbfjetzcnwosvpl.supabase.co/functions/v1/loops";
+let TOKEN = sessionStorage.getItem("loops_token") || "";
+let SELECTED = null;       // selected class id
+let LEDGER = [];           // cached ledger rows
+let POOLED = false;        // reliability pooling toggle
+let TACIT_ONLY = false;
+
+async function api(resource, params){
+  const qs = params ? ("?" + new URLSearchParams(params).toString()) : "";
+  const r = await fetch(API + "/api/" + resource + qs, { headers: { "x-loops-token": TOKEN } });
+  const body = await r.json().catch(()=>({error:"non-JSON response"}));
+  if(!r.ok) throw new Error(body.error || ("HTTP " + r.status));
+  return body;
+}
+const el = id => document.getElementById(id);
+const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt = (x,d=2) => x==null ? "—" : Number(x).toFixed(d);
+const shortGen = g => g==null ? "—" : g.replace("untagged (pre-§3.7)","untagged");
+const classLabel = r => `${r.target_kind} · ${r.origin_kind} · <span class="mono">${esc(shortGen(r.generator_tag))}</span>`;
+
+// ---------- gate ----------
+async function unlock(){
+  TOKEN = el("token").value.trim();
+  if(!TOKEN){ el("gate-hint").innerHTML = '<span class="err">Enter a token.</span>'; return; }
+  el("gate-hint").textContent = "Checking…";
+  try{
+    const v = await api("vitals");
+    sessionStorage.setItem("loops_token", TOKEN);
+    el("gate").classList.add("hidden");
+    el("app").classList.remove("hidden");
+    renderVitals(v);
+    await loadLedger();
+  }catch(e){
+    el("gate-hint").innerHTML = '<span class="err">'+esc(e.message)+'</span>';
+  }
+}
+el("unlock").addEventListener("click", unlock);
+el("token").addEventListener("keydown", e => { if(e.key==="Enter") unlock(); });
+
+// ---------- vitals ----------
+function renderVitals(v){
+  const cov = v.calibration_coverage || {};
+  const covOk = (cov.green||0)+(cov.amber||0);
+  const oldest = v.oldest_open;
+  el("vitals").innerHTML = `
+    <div class="vital"><div class="k">disposal / brief</div><div class="v">${fmt(v.disposal_rate_per_brief,1)} <small>14d</small></div></div>
+    <div class="vital"><div class="k">resolved outcomes</div><div class="v">${v.resolved_total} <small>all classes</small></div></div>
+    <div class="vital"><div class="k">calibration coverage</div><div class="v">${covOk}/${cov.classes_total||0} <small>≥ amber</small></div></div>
+    <div class="vital ${oldest && oldest.age_days>=30?'alarm':''}"><div class="k">oldest open claim</div><div class="v">${oldest?Math.round(oldest.age_days)+'d':'—'} <small>active debt</small></div></div>
+    <div class="vital"><div class="k">lapsed · unscored</div><div class="v">${v.lapsed_total} <small>expired, never scored</small></div></div>`;
+  renderSpark(v.disposal_sparkline || []);
+}
+function renderSpark(data){
+  const w=280,h=34,n=data.length,max=Math.max(1,...data);
+  const bw = n? (w/n) : w;
+  let bars="";
+  data.forEach((d,i)=>{ const bh=Math.max(1,(d/max)*(h-4)); bars+=`<rect x="${i*bw+1}" y="${h-bh}" width="${bw-2}" height="${bh}" fill="var(--gold)" opacity="0.7"></rect>`; });
+  el("spark").innerHTML = `<svg width="${w}" height="${h}" role="img" aria-label="14-day disposal sparkline">${bars}</svg>`;
+}
+
+// ---------- ledger ----------
+async function loadLedger(){
+  const d = await api("ledger");
+  LEDGER = d.classes || [];
+  const rows = LEDGER.map(r => {
+    const pill = `<span class="pill ${r.band==='green'?'green':r.band==='amber'?'amber':'grey'}">${r.n_resolved===0?'no history':r.band}</span>`;
+    const debt = r.open_debt>0 ? `<span class="debt">${r.open_debt} · med ${fmt(r.median_open_days,0)}d</span>` : '<span class="dim">—</span>';
+    const lapsed = r.lapsed>0 ? `<span class="dim">${r.lapsed}</span>` : '<span class="dim">—</span>';
+    const inf = r.origin_inferred_share!=null ? `<span class="tag">${Math.round(r.origin_inferred_share*100)}% inf</span>` : '';
+    return `<tr class="click ${r.id===SELECTED?'sel':''}" data-id="${esc(r.id)}">
+      <td>${classLabel(r)} ${inf}</td>
+      <td><span class="tag">${r.resolvability}</span></td>
+      <td class="mono">${r.n_resolved}</td>
+      <td class="mono">${r.k_confirmed}</td>
+      <td class="mono">${debt}</td>
+      <td class="mono">${lapsed}</td>
+      <td class="mono">${r.resolvability==='censored'?'<span class="dim">precision-only</span>':fmt(r.base_rate,2)}</td>
+      <td class="mono">${fmt(r.brier,3)}</td>
+      <td>${pill}</td>
+      <td class="mono dim">${r.last_resolution?r.last_resolution.slice(0,10):'—'}</td>
+    </tr>`;
+  }).join("");
+  el("ledger-body").innerHTML = `<table>
+    <thead><tr><th>Class</th><th>Resolv.</th><th>Res.</th><th>Conf.</th><th>Open debt</th><th>Lapsed</th><th>Base rate</th><th>Brier</th><th>State</th><th>Last res.</th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="10" class="dim">No classes yet.</td></tr>'}</tbody></table>`;
+  el("ledger-body").querySelectorAll("tr.click").forEach(tr=>{
+    tr.addEventListener("click", ()=> selectClass(tr.dataset.id, true));
+  });
+  if(!SELECTED && LEDGER.length){ const g = LEDGER.find(r=>r.n_resolved>0) || LEDGER[0]; SELECTED = g.id; }
+  if(SELECTED){ loadReliability(); loadFloor(); loadOverrides(); }
+}
+
+function selectClass(id, jump){
+  SELECTED = id;
+  el("ledger-body").querySelectorAll("tr.click").forEach(tr=> tr.classList.toggle("sel", tr.dataset.id===id));
+  loadReliability(); loadFloor(); loadOverrides();
+  if(jump) switchTab("reliability");
+}
+
+// ---------- reliability ----------
+async function loadReliability(){
+  if(!SELECTED) return;
+  el("rel-h").textContent = "Reliability · " + labelOf(SELECTED);
+  let d;
+  try{ d = await api("reliability", {class:SELECTED}); }
+  catch(e){ el("rel-body").innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  if(d.honest_empty){
+    el("rel-body").innerHTML = `<div class="empty">${esc(d.note||'No resolved outcomes in this class. Every claim here is unscored. First score arrives with the first claim_outcomes row.')}</div>`;
+    return;
+  }
+  const wm = d.watermark ? `<div class="wm">${esc(d.watermark)}</div>` : "";
+  el("rel-body").innerHTML = `${wm}<div class="rel-grid">
+    <div>${relSVG(d)}</div>
+    <div>
+      <button class="toggle" id="pool-toggle" type="button" aria-pressed="${POOLED}">Pooling · raw ⇄ partial (m=${d.partial_pool.m})</button>
+      <div class="metric-row">
+        <div class="metric"><div class="k">Brier</div><div class="v gold">${fmt(d.murphy.brier,3)}</div></div>
+        <div class="metric"><div class="k">Log score</div><div class="v gold">${fmt(d.log_score,2)}</div></div>
+        <div class="metric"><div class="k">Overconfidence</div><div class="v raw">${d.overconfidence>=0?'+':''}${fmt(d.overconfidence,2)}</div></div>
+        <div class="metric"><div class="k">n resolved</div><div class="v">${d.n}</div></div>
+      </div>
+      <div class="decomp">
+        ${dbar('Reliability ↓', d.murphy.reliability, d.murphy.uncertainty)}
+        ${dbar('Resolution ↑', d.murphy.resolution, d.murphy.uncertainty)}
+        ${dbar('Uncertainty', d.murphy.uncertainty, d.murphy.uncertainty)}
+        <div class="identity">BS = REL − RES + UNC = ${fmt(d.murphy.reliability,3)} − ${fmt(d.murphy.resolution,3)} + ${fmt(d.murphy.uncertainty,3)} = ${fmt(d.murphy.identity_check,3)} ${Math.abs(d.murphy.identity_check-d.murphy.brier)<0.001?'✓':'⚠'}</div>
+      </div>
+      <p class="note" style="margin-top:20px">Binning: <span class="mono">${d.binning}</span>. Pooled μ (sibling classes) = <span class="mono">${fmt(d.partial_pool.mu,3)}</span>; class pooled ${fmt(d.partial_pool.raw,3)} → ${fmt(d.partial_pool.pooled,3)}. Log score clipped to [${d.log_clip[0]}, ${d.log_clip[1]}].</p>
+    </div></div>`;
+  const pt = el("pool-toggle");
+  if(pt) pt.addEventListener("click", ()=>{ POOLED=!POOLED; loadReliability(); });
+}
+function dbar(lbl, val, scale){
+  const pct = Math.min(100, (val/Math.max(scale,1e-9))*100);
+  return `<div class="dbar"><span class="lbl">${lbl}</span><span class="track"><span class="fill" style="width:${pct}%"></span></span><span class="mono">${fmt(val,3)}</span></div>`;
+}
+function relSVG(d){
+  const X0=60,X1=400,Y0=360,Y1=20, W=X1-X0, H=Y0-Y1;
+  const px = p => X0 + p*W, py = o => Y0 - o*H;
+  const maxN = Math.max(1, ...d.bins.map(b=>b.n));
+  let bars="",pts="",pooled="";
+  d.bins.forEach(b=>{
+    const x=px(b.p_bar);
+    bars += `<line x1="${x}" y1="${py(b.wilson.lo)}" x2="${x}" y2="${py(b.wilson.hi)}" stroke="rgb(198,165,83)" stroke-width="1.5" opacity="0.55"/>`;
+    const r = 4 + 4*(b.n/maxN);
+    pts += `<circle cx="${x}" cy="${py(b.o_bar)}" r="${r}" fill="rgb(198,165,83)"/>`;
+    if(POOLED) pooled += `<circle cx="${x}" cy="${py(b.o_bar_pooled)}" r="${r}" fill="none" stroke="rgb(198,165,83)" stroke-width="1.4" opacity="0.6"/>`;
+  });
+  return `<svg viewBox="0 0 440 410" width="100%" role="img" aria-label="Reliability diagram with Wilson intervals">
+    <polygon points="${X0},${Y0} ${X1},${Y1} ${X1},${Y0}" fill="rgba(244,240,233,0.03)"/>
+    <line x1="${X0}" y1="${Y0}" x2="${X1}" y2="${Y0}" stroke="rgba(244,240,233,0.3)"/>
+    <line x1="${X0}" y1="${Y1}" x2="${X0}" y2="${Y0}" stroke="rgba(244,240,233,0.3)"/>
+    <line x1="${X0}" y1="${Y0}" x2="${X1}" y2="${Y1}" stroke="rgba(244,240,233,0.25)" stroke-dasharray="4 4"/>
+    <g font-family="IBM Plex Mono" font-size="10" fill="rgba(244,240,233,0.35)">
+      <text x="54" y="365" text-anchor="end">0</text><text x="54" y="195" text-anchor="end">.5</text><text x="54" y="28" text-anchor="end">1</text>
+      <text x="${X0}" y="380" text-anchor="middle">0</text><text x="230" y="380" text-anchor="middle">.5</text><text x="${X1}" y="380" text-anchor="middle">1</text>
+      <text x="230" y="402" text-anchor="middle" letter-spacing="2">PREDICTED (RAW, INTERNAL)</text>
+      <text x="16" y="190" transform="rotate(-90 16 190)" text-anchor="middle" letter-spacing="2">OBSERVED</text>
+    </g>
+    ${bars}${pts}${pooled}
+    ${POOLED?`<text x="${X1-46}" y="30" font-family="IBM Plex Mono" font-size="9" fill="rgba(244,240,233,0.4)">pooled = hollow</text>`:''}
+  </svg>`;
+}
+
+// ---------- floor ----------
+async function loadFloor(){
+  if(!SELECTED) return;
+  el("floor-h").textContent = "Floor · " + labelOf(SELECTED);
+  let d;
+  try{ d = await api("floor", {class:SELECTED}); }
+  catch(e){ el("floor-body").innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  const pos = v => (v==null? null : Math.max(2, Math.min(98, v*100)));
+  const cur=pos(d.current), rev=pos(d.revealed), act=pos(d.actuarial);
+  const m = (cls,p,lab,val,dashed) => p==null ? "" :
+    `<div class="marker ${cls} ${dashed?'dashed':''}" style="left:${p}%"><span class="lab">${lab}</span><span class="val">${val}</span></div>`;
+  const strip = `<div class="strip-wrap"><div class="strip"></div>
+    ${m('m-cur',cur,'current (config)',fmt(d.current,2))}
+    ${m('m-rev',rev,'revealed (disposals)',fmt(d.revealed,2))}
+    ${m('m-act',act,'actuarial · Wilson-LB ≥ .80',fmt(d.actuarial,2),d.actuarial_vacuous)}
+  </div>`;
+  const vac = d.actuarial_vacuous ? `<p class="note mono" style="font-style:normal;font-size:11.5px">n resolved = ${d.n_resolved}; distribution-free guarantee vacuous below n=20 — actuarial marker dashed.</p>` : `<p class="note mono" style="font-style:normal;font-size:11.5px">n resolved = ${d.n_resolved}; above n=20, the Wilson-LB guarantee holds.</p>`;
+  const note = `<p class="note">${esc(d.current_note)}</p>`;
+  let prop = `<div class="empty">No threshold proposal: ${d.actuarial==null?'no floor clears the target at n≥10':d.current==null?'no registered model floor to move (untagged class)':'actuarial equals current'}.</div>`;
+  if(d.threshold_proposal){
+    prop = `<div class="proposal"><div class="plabel">Draft threshold proposal · proposal-shaped, never applied here</div>
+      <pre id="prop-json">${esc(JSON.stringify(d.threshold_proposal,null,2))}</pre>
+      <button class="btn" id="copy-prop" type="button">Copy proposal</button></div>`;
+  }
+  el("floor-body").innerHTML = strip + vac + note + prop;
+  const cp = el("copy-prop");
+  if(cp) cp.addEventListener("click", ()=>{ navigator.clipboard?.writeText(el("prop-json").textContent); cp.textContent="Copied ✓"; setTimeout(()=>cp.textContent="Copy proposal",1500); });
+}
+
+// ---------- overrides ----------
+async function loadOverrides(){
+  if(!SELECTED) return;
+  el("ov-h").textContent = "Overrides · " + labelOf(SELECTED);
+  let d;
+  try{ d = await api("overrides", {class:SELECTED}); }
+  catch(e){ el("ov-body").innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  if(d.censored){ el("ov-body").innerHTML = `<div class="empty">${esc(d.note)}</div>`; return; }
+  const v = d.vetoes;
+  const rows = (v.rows||[]).map(r=>`<tr>
+    <td class="dim">${esc(r.target_id.slice(0,8))}</td>
+    <td class="mono raw">${fmt(r.raw_conf_internal,2)}</td>
+    <td class="mono">${esc(r.outcome)}</td>
+    <td>${r.comment?esc(r.comment):(r.reason_code?'<span class="dim">['+esc(r.reason_code)+']</span>':'<span class="dim">—</span>')}</td>
+  </tr>`).join("");
+  el("ov-body").innerHTML = `
+    <div class="score-grid">
+      <div class="score"><div class="k">Vetoes · rejected in top band</div><div class="big">${v.n}</div>
+        <p class="note" style="margin:8px 0 0">Top band n=${v.top_band_n}, base confirm rate ${v.top_band_confirm_rate==null?'—':Math.round(v.top_band_confirm_rate*100)+'%'} (raw conf ≥ ${fmt(d.threshold_internal,2)}, internal).</p></div>
+      <div class="score"><div class="k">Rescues · accepted below floor</div>
+        <div class="locked" style="border:none;padding:8px 0 0">${esc(d.rescues.reason)} When it ships, a rescued refusal that confirms is the single strongest signal the floor is too high.</div></div>
+    </div>
+    <p class="note">${esc(d.note)}</p>
+    <table><thead><tr><th>Claim</th><th>Raw conf.</th><th>Outcome</th><th>Override comment / reason</th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="4" class="dim">No high-confidence rejections in this class.</td></tr>'}</tbody></table>`;
+}
+
+// ---------- lessons ----------
+async function loadLessons(){
+  let d;
+  try{ d = await api("lessons"); }
+  catch(e){ el("les-body").innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  const all = d.lessons||[];
+  const enc = all.filter(l=>l.status==='encoded').length;
+  el("les-h").innerHTML = `Lessons · promotion tracker · <span class="mono" style="color:var(--ink-dim)">${enc} encoded / ${all.length}</span>`;
+  const shown = TACIT_ONLY ? all.filter(l=>l.status==='tacit') : all;
+  const rows = shown.map(l=>`<tr>
+    <td class="mono">${esc(l.id)}</td>
+    <td>${esc(l.statement)}</td>
+    <td><span class="pill ${l.status==='encoded'?'green':'grey'}">${l.status}</span></td>
+    <td class="mono dim">${l.encoded_in?esc(l.encoded_in):'—'}</td>
+    <td class="mono dim">${esc(l.date||'—')}</td>
+  </tr>`).join("");
+  el("les-body").innerHTML = `<table><thead><tr><th>#</th><th>Lesson</th><th>Status</th><th>Encoded in</th><th>Date</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+el("tacit-filter").addEventListener("click", ()=>{ TACIT_ONLY=!TACIT_ONLY; el("tacit-filter").setAttribute("aria-pressed",TACIT_ONLY); loadLessons(); });
+
+// ---------- tabs ----------
+const tabs=[...document.querySelectorAll('.tab')];
+function switchTab(name){
+  tabs.forEach(x=>x.setAttribute('aria-selected', x.dataset.p===name ? 'true':'false'));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('on', p.id===name));
+  if(name==='lessons') loadLessons();
+}
+tabs.forEach(t=>t.addEventListener('click',()=>switchTab(t.dataset.p)));
+
+function labelOf(id){ const r = LEDGER.find(x=>x.id===id); return r ? `${r.target_kind} · ${r.origin_kind} · ${shortGen(r.generator_tag)}` : id; }
+
+// auto-unlock if a token is already in session storage
+if(TOKEN){ el("token").value = TOKEN; unlock(); }
+</script>
+</body>
+</html>
