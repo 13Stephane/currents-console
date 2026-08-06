@@ -95,6 +95,33 @@
     margin-top: 20px;
   }
   button[disabled] { opacity: .55; cursor: default; }
+  .q { color: var(--muted); font-style: italic; }
+  .hint {
+    font-size: 12px;
+    color: var(--muted);
+    margin: 4px 0 0;
+  }
+  .codes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  /* Reject codes read as peers, not as one primary action — the operator is
+     classifying, not confirming. Distinct from the gold confirm button. */
+  button.code {
+    font-size: 14px;
+    font-weight: normal;
+    color: var(--ink);
+    background: var(--card);
+    border: 1px solid var(--rule);
+    padding: 9px 16px;
+    margin-top: 0;
+  }
+  button.code:hover:not([disabled]) {
+    border-color: var(--gold);
+    color: var(--gold);
+  }
   a.console {
     display: inline-block;
     margin-top: 18px;
@@ -150,6 +177,12 @@ async function load() {
 }
 
 function render(data) {
+  // Reject carries the console's reason picker (served by email-action so the two
+  // surfaces can't drift). The code routes the signal and gates calibration: 'wrong'
+  // or no code debits the confidence curve, the rest route to other gates. Without
+  // this, every email reject would silently read as "bad inference".
+  if (data.reason_codes && data.reason_codes.length) return renderReject(data);
+
   const intro = data.is_acted
     ? `<p class="lede">Optional — paste what you actually sent for an exact record. Leave blank to record the proposed draft.</p>`
     : `<p class="lede">Confirm you want to <b>${esc(String(data.label).toLowerCase())}</b> this suggestion.</p>`;
@@ -164,15 +197,40 @@ function render(data) {
   document.getElementById("go").addEventListener("click", () => submit(data));
 }
 
+function renderReject(data) {
+  slot.innerHTML =
+    `<div class="headline">${esc(data.suggested_action)}</div>` +
+    `<p class="lede">Why reject? <span class="q">(this routes the signal)</span></p>` +
+    `<textarea id="comment" rows="2" placeholder="Specific reason (optional) — e.g. &quot;too remote from my expertise AND no close relation to the org&quot;"></textarea>` +
+    `<p class="hint">reprocessed when learning why theses get rejected</p>` +
+    `<div class="codes">` +
+    data.reason_codes.map((r, i) =>
+      `<button class="code" data-i="${i}" title="${esc(r.tip)}">${esc(r.label)}</button>`
+    ).join("") +
+    `</div>` +
+    `<p class="fine">This link is single-use and tied to one suggestion.</p>`;
+
+  slot.querySelectorAll("button.code").forEach((b) => {
+    b.addEventListener("click", () => {
+      const r = data.reason_codes[Number(b.dataset.i)];
+      slot.querySelectorAll("button.code").forEach((x) => { x.disabled = true; });
+      b.textContent = "Recording…";
+      submit(data, r.code);
+    });
+  });
+}
+
 // POST — the mutation, and only from this deliberate click.
-async function submit(data) {
+async function submit(data, reasonCode) {
   const btn = document.getElementById("go");
-  btn.disabled = true;
-  btn.textContent = "Recording…";
+  if (btn) { btn.disabled = true; btn.textContent = "Recording…"; }
 
   const body = new URLSearchParams();
   const sent = document.getElementById("sent");
   if (sent && sent.value.trim()) body.set("sent_text", sent.value.trim());
+  const comment = document.getElementById("comment");
+  if (comment && comment.value.trim()) body.set("comment", comment.value.trim());
+  if (reasonCode) body.set("reason_code", reasonCode);
 
   let out;
   try {
@@ -183,8 +241,7 @@ async function submit(data) {
     });
     out = await res.json();
   } catch (e) {
-    btn.disabled = false;
-    btn.textContent = `Confirm ${data.label}`;
+    if (btn) { btn.disabled = false; btn.textContent = `Confirm ${data.label}`; }
     return fail("Couldn't reach Currents. Nothing was recorded — reload to retry.");
   }
 
