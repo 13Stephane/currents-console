@@ -176,6 +176,30 @@
   .pcard { background: var(--bg-2); border: 1px solid var(--line); border-radius: 5px;
     max-width: 640px; width: 100%; padding: 26px 28px 30px; box-shadow: 0 18px 60px rgba(0,0,0,.4); }
   .pcard .pclose { float: right; margin: 0; }
+  /* Merge composer (§5). Drafted text reads as a proposal, not a commitment, and the mark
+     clears on the first keystroke. A dropped branch is styled gold, never --reject: §6.2
+     holds that drop/park/reject/abandon are one act and must never read as failure. */
+  .drafted { font-style: italic; border-color: rgba(198,165,83,.5) !important; color: var(--gold); }
+  .mg-parent { border: 1px dashed var(--line); border-radius: 3px; padding: 12px 14px; margin-bottom: 10px; }
+  .mg-parent.is-carried { border-left: 2px solid var(--green); }
+  .mg-parent.is-dropped { border-left: 2px solid var(--gold); }
+  .mg-conseq { background: rgba(255,255,255,.02); border: 1px solid var(--line); border-radius: 6px; padding: 12px 15px; margin-top: 16px; }
+  .mg-conseq .cline { display: flex; gap: 14px; font-family: "IBM Plex Mono", monospace; font-size: 11.5px; line-height: 1.95; color: var(--ink-dim); }
+  .mg-conseq .cline b { flex: 0 0 138px; font-weight: 400; color: var(--ink-faint);
+    text-transform: uppercase; letter-spacing: .1em; font-size: 10px; line-height: 2.3; }
+  /* The value column wraps as whole phrases. A count broken across two lines ("3 / propositions")
+     reads as two numbers, which is the one thing this panel must not do. */
+  .mg-conseq .cline .cval { flex: 1 1 auto; min-width: 0; display: flex; gap: 12px; flex-wrap: wrap; }
+  .mg-conseq .cline .cval .cmain { white-space: nowrap; }
+  .mg-conseq .cline .cval .cside { color: var(--ink-faint); flex: 1 1 200px; min-width: 0; }
+  @media (max-width: 640px) {
+    .mg-conseq .cline { flex-direction: column; gap: 0; margin-bottom: 8px; }
+    .mg-conseq .cline b { flex: none; line-height: 1.6; }
+  }
+  .mg-pick { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px;
+    border: 1px solid var(--line); border-radius: 3px; margin-bottom: 5px; cursor: pointer; }
+  .mg-pick:hover { border-color: var(--gold); }
+  .mg-pick input { width: auto; flex: 0 0 auto; margin-top: 3px; }
   .pname { font-size: 22px; font-weight: 400; margin: 0 0 3px; letter-spacing: -.01em; }
   .pident { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--ink-dim); margin-bottom: 4px; }
   .pbg { font-size: 14px; color: var(--ink-dim); font-style: italic; margin: 10px 0 4px; line-height: 1.45; }
@@ -512,6 +536,18 @@
           <div class="out" id="p_createOut" style="margin-top:8px"></div>
         </div>
       </details>
+      <details style="margin-top:8px" id="mergePicker">
+        <summary class="hint" style="cursor:pointer">⧉ merge propositions</summary>
+        <div style="margin-top:8px">
+          <p class="hint">Pick two or more, then open the composer. Only <em>active</em> and <em>paused</em> propositions are listed: <em>won</em> is current but not mergeable, and the RPC refuses it. Clustering is out of scope while <span class="mono">intent_embedding</span> is unpopulated — at nine propositions the pick is faster by hand.</p>
+          <div id="mg_candidates" style="margin-top:10px"></div>
+          <div class="acts">
+            <button id="mg_openBtn" class="btn-accept">Open composer</button>
+            <button id="mg_refreshBtn" class="ghost">refresh</button>
+          </div>
+          <div class="out" id="mg_pickOut"></div>
+        </div>
+      </details>
       <div id="propList" style="margin-top:14px"></div>
     </div>
     <div class="panel" id="propDetailPanel" style="display:none">
@@ -526,6 +562,14 @@
   <div class="pcard">
     <button class="ghost mini pclose" id="profileClose">✕ close</button>
     <div id="profileBody"><p class="hint">Loading…</p></div>
+  </div>
+</div>
+
+<!-- Merge composer modal (§5 of docs/design_proposition_merge_spec.md) -->
+<div class="pmodal" id="mergeModal">
+  <div class="pcard" style="max-width:900px">
+    <button class="ghost mini pclose" id="mergeClose">✕ close</button>
+    <div id="mergeBody"><p class="hint">Loading…</p></div>
   </div>
 </div>
 
@@ -2138,7 +2182,13 @@
         await api("update_proposition", { proposition_id: p.id, thesis_statement: text }); openProposition(p.id)
       }))
     rfBtn.style.marginTop = "0"
-    host.appendChild(rfBtn); host.appendChild(rfSlot)
+    host.appendChild(rfBtn)
+    // Lineage (§5). Present on every proposition: the op answers "was this folded from
+    // anything" for propositions that were not, which is itself the reading.
+    const lnSlot = document.createElement("div"); lnSlot.dataset.open = "0"; lnSlot.style.margin = "0 0 10px"
+    const lnBtn = mkBtn("⑃ Lineage", "btn-edit", () => openLineage(p.id, lnSlot))
+    lnBtn.style.cssText = "margin-top:0;margin-left:8px"
+    host.appendChild(lnBtn); host.appendChild(rfSlot); host.appendChild(lnSlot)
 
     // lifecycle
     const life = document.createElement("div"); life.className = "acts"; life.style.marginBottom = "10px"
@@ -2369,6 +2419,519 @@
       await api("record_outreach", { person_id: COMPOSE.personId, subject, body: bodyTxt, proposition_id: COMPOSE.propId, via: "manual" })
       show($("compose_out"), copy ? "Copied to clipboard · outreach recorded." : "Outreach recorded.", true)
     } catch (e) { show($("compose_out"), e.message, false) }
+  }
+
+  // ---- Merge composer (§5 of docs/design_proposition_merge_spec.md) -----------------
+  // Manual multi-select → declare a role per parent → read the consequences → commit.
+  // Every check below mirrors a guard in merge_propositions(), for a clearer message and
+  // a cheaper round trip. The RPC is the authority; anything enforced only here is not
+  // enforced at all.
+  //
+  // Drafting sits OUTSIDE the console, deliberately. §5 asks for model-drafted child text
+  // and a model-suggested drop rationale, but no console op produces either, and writing
+  // that framing into the edge function before one real merge has exercised it would pin
+  // wording nobody has tested. Instead the composer copies a self-contained brief out and
+  // takes a draft back. The brief names no vendor and assumes no API, so the model on the
+  // other end is the operator's choice and swapping it costs nothing.
+
+  const MG_FALSIFIER_KEYS = ["declared_at", "by", "condition", "instrument", "escape"]
+  const MG_FALSIFIER_HELP = {
+    declared_at: "when this falsifier was written, not when the proposition opened",
+    by: "the review date the condition is evaluated at",
+    condition: "what would have to be true for this proposition to have failed",
+    instrument: "where the evidence will come from, named in advance",
+    escape: "what happens if the instrument was never kept",
+  }
+
+  // Retune what the model is asked for by editing this. It lives in the page, not in the
+  // edge function, so a retune is a file edit and a mirror push rather than a deploy — and
+  // nothing here is specific to one vendor's model.
+  const MG_BRIEF_FRAMING = {
+    task: "Draft the child of a proposition merge. A merge folds two or more workspaces into one: carried parents continue their work inside the child, dropped parents stop here.",
+    house_style: "No em dashes. No hedging. No filler. One idea per line. End on a concrete verb.",
+    reply_with: "ONLY the JSON object described by output_shape. No prose before it, none after it.",
+    rules: [
+      "Copy parent ids exactly. Never invent one.",
+      "Write a rationale only for parents whose role is 'dropped'. It becomes a permanent retired_reason and cannot be quietly revised afterwards.",
+      "A dropped branch is a withdrawal, not a failure. Write it as a judgement about where the work now sits, not as a post-mortem.",
+      "falsifier: return all five keys or omit the falsifier key entirely. A partial falsifier is refused, because it looks like a commitment and is not one.",
+      "instrument and escape are the two most drafts omit. instrument stops the claim being judged against whatever evidence happens to be lying around at review. escape closes the loophole where an untracked claim resolves in its own favour: it closes as unevaluable, not confirmed.",
+    ],
+    output_shape: {
+      title: "one line, the child proposition's name",
+      kind: "product | project",
+      thesis_statement: "the positioning this workspace now holds, synthesised across the carried parents",
+      falsifier: MG_FALSIFIER_HELP,
+      parents: [{ id: "uuid, copied from parents below", rationale: "one line, dropped parents only" }],
+    },
+  }
+
+  let MG_CANDS = []
+  let MG_WITHDRAWAL = null
+  let MG = null   // active composer state
+
+  async function loadMergeCandidates() {
+    const host = $("mg_candidates"); host.textContent = "loading…"
+    try {
+      const r = await api("merge_candidates", {})
+      MG_CANDS = r.candidates || []
+      MG_WITHDRAWAL = r.withdrawal || null
+      renderMergeCandidates()
+    } catch (e) { host.textContent = e.message }
+  }
+
+  function renderMergeCandidates() {
+    const host = $("mg_candidates"); host.innerHTML = ""
+    if (!MG_CANDS.length) {
+      host.innerHTML = '<p class="hint">Nothing mergeable. A merge needs two or more propositions that are active or paused.</p>'
+      return
+    }
+    for (const c of MG_CANDS) {
+      const row = document.createElement("label"); row.className = "mg-pick"
+      const cb = document.createElement("input"); cb.type = "checkbox"; cb.value = c.id; cb.className = "mg-cb"
+      row.appendChild(cb)
+      const body = document.createElement("div"); body.style.flex = "1"
+      const t = document.createElement("div"); t.style.cssText = "font-family:'IBM Plex Mono',monospace;font-size:12.5px"
+      t.innerHTML = markSpan("inf_hollow", "mk-inf") + " " + esc(c.title)
+      body.appendChild(t)
+      const m = document.createElement("div"); m.className = "hint"; m.style.marginTop = "3px"
+      m.textContent = [c.product || c.kind, c.status,
+        c.tasks + " task" + (c.tasks === 1 ? "" : "s"),
+        c.resolved_suggestions + " resolved suggestion" + (c.resolved_suggestions === 1 ? "" : "s"),
+        c.has_falsifier ? "falsifier declared" : "no falsifier"].filter(Boolean).join(" · ")
+      body.appendChild(m)
+      row.appendChild(body)
+      host.appendChild(row)
+    }
+  }
+
+  function mgSelectedIds() {
+    return [...document.querySelectorAll("#mg_candidates .mg-cb")].filter((c) => c.checked).map((c) => c.value)
+  }
+
+  function openMergeComposer() {
+    const ids = mgSelectedIds()
+    // Mirrors the RPC's two-parent minimum. One parent is a rescope, which §3.1 defines
+    // and this build deliberately does not ship.
+    if (ids.length < 2) {
+      show($("mg_pickOut"), "Pick at least two. One parent is a rescope, not a merge, and the RPC refuses it.", false)
+      return
+    }
+    $("mg_pickOut").className = "out"
+    MG = {
+      parents: ids.map((id) => {
+        const c = MG_CANDS.find((x) => x.id === id) || { id, title: "(unknown)" }
+        // Roles initialise UNDECLARED. A default role is a declaration nobody made, which
+        // defeats the point of declaring before the outcome is known.
+        return { ...c, role: null, rationale: "", suggested: false }
+      }),
+      draftedFields: new Set(),
+    }
+    $("mergeModal").classList.add("show")
+    renderMergeComposer()
+  }
+  function closeMergeComposer() { $("mergeModal").classList.remove("show"); MG = null }
+
+  function mgLabel(text) { const l = document.createElement("label"); l.textContent = text; return l }
+  function mgSectionHead(text) {
+    const d = document.createElement("div"); d.className = "hint"
+    d.style.cssText = "text-transform:uppercase;letter-spacing:.12em;color:var(--ink-faint);margin:20px 0 8px;border-bottom:1px solid var(--line);padding-bottom:4px"
+    d.textContent = text; return d
+  }
+  // A field filled from a pasted draft carries the mark until the operator touches it.
+  // First keystroke clears it, which is what makes the mark mean "not yet yours".
+  function mgMarkDrafted(el, key) {
+    el.classList.add("drafted"); MG.draftedFields.add(key)
+    const clear = () => { el.classList.remove("drafted"); MG.draftedFields.delete(key); el.removeEventListener("input", clear) }
+    el.addEventListener("input", clear)
+  }
+
+  function renderMergeComposer() {
+    const host = $("mergeBody"); host.innerHTML = ""
+    const h = document.createElement("h2")
+    h.textContent = "Merge " + MG.parents.length + " propositions"
+    host.appendChild(h)
+    const lede = document.createElement("p"); lede.className = "hint"
+    lede.textContent = "Carried parents fold into the child and keep their status. Dropped parents close here and keep merged_into null, so lineage reads them out of the chained merge event rather than the graph."
+    host.appendChild(lede)
+
+    // ── draft in / draft out ────────────────────────────────────────────────
+    const dacts = document.createElement("div"); dacts.className = "acts"
+    dacts.appendChild(mkBtn("⧉ Copy merge brief", "btn-edit", copyMergeBrief))
+    dacts.appendChild(mkBtn("⬇ Paste draft", "btn-edit", toggleMergePaste))
+    host.appendChild(dacts)
+    const dhint = document.createElement("p"); dhint.className = "hint"; dhint.style.marginTop = "6px"
+    dhint.textContent = "Declare the roles first: the brief tells the model which parents are dropped, and only those need a rationale. Take the brief to any model, paste the JSON back. Drafted text shows italic gold and clears the moment you edit it."
+    host.appendChild(dhint)
+    const pasteSlot = document.createElement("div"); pasteSlot.id = "mg_pasteSlot"; pasteSlot.dataset.open = "0"
+    host.appendChild(pasteSlot)
+
+    // ── the child ───────────────────────────────────────────────────────────
+    host.appendChild(mgSectionHead("The child"))
+    host.appendChild(mgLabel("Title *"))
+    const title = document.createElement("input"); title.id = "mg_title"; host.appendChild(title)
+    host.appendChild(mgLabel("Kind"))
+    const kind = document.createElement("select"); kind.id = "mg_kind"
+    for (const k of ["product", "project"]) { const o = document.createElement("option"); o.value = k; o.textContent = k; kind.appendChild(o) }
+    host.appendChild(kind)
+    host.appendChild(mgLabel("Thesis statement"))
+    const thesis = document.createElement("textarea"); thesis.id = "mg_thesis"; thesis.rows = 3; host.appendChild(thesis)
+
+    // ── falsifier ───────────────────────────────────────────────────────────
+    host.appendChild(mgSectionHead("Falsifier · all five or none"))
+    const fhint = document.createElement("p"); fhint.className = "hint"
+    fhint.textContent = "Optional. Leave every field empty to merge without one and declare it later; the workspace marks the proposition unfalsified. Fill some but not all and the commit is refused: a partial falsifier looks like a commitment and is not one."
+    host.appendChild(fhint)
+    for (const k of MG_FALSIFIER_KEYS) {
+      const lab = mgLabel(k)
+      if (k === "declared_at") {
+        const today = mkBtn("today", "ghost mini", () => {
+          const el = $("mg_f_declared_at"); el.value = new Date().toISOString().slice(0, 10)
+          el.classList.remove("drafted"); MG.draftedFields.delete("falsifier.declared_at")
+        })
+        today.style.cssText = "margin-left:10px;vertical-align:middle"
+        lab.appendChild(today)
+      }
+      host.appendChild(lab)
+      const inp = document.createElement("input"); inp.id = "mg_f_" + k; inp.placeholder = MG_FALSIFIER_HELP[k]
+      host.appendChild(inp)
+    }
+
+    // ── parents ─────────────────────────────────────────────────────────────
+    host.appendChild(mgSectionHead("Parents · declare a role for each"))
+    const phost = document.createElement("div"); phost.id = "mg_parents"; host.appendChild(phost)
+
+    // ── consequences ────────────────────────────────────────────────────────
+    host.appendChild(mgSectionHead("Consequences"))
+    const chost = document.createElement("div"); chost.className = "mg-conseq"; chost.id = "mg_conseq"; host.appendChild(chost)
+
+    const acts = document.createElement("div"); acts.className = "acts"
+    acts.appendChild(mkBtn("Commit merge", "btn-accept", commitMerge))
+    host.appendChild(acts)
+    const out = document.createElement("div"); out.className = "out"; out.id = "mg_out"; host.appendChild(out)
+
+    MG.parentsHost = phost; MG.conseqHost = chost
+    paintMergeParents(); paintMergeConsequences()
+  }
+
+  function paintMergeParents() {
+    const host = MG.parentsHost; host.innerHTML = ""
+    for (const p of MG.parents) {
+      const card = document.createElement("div")
+      card.className = "mg-parent" + (p.role === "carried" ? " is-carried" : p.role === "dropped" ? " is-dropped" : "")
+      const t = document.createElement("div"); t.style.cssText = "font-family:'IBM Plex Mono',monospace;font-size:12.5px"
+      t.innerHTML = markSpan("inf_hollow", "mk-inf") + " " + esc(p.title)
+      card.appendChild(t)
+      const m = document.createElement("div"); m.className = "hint"; m.style.marginTop = "3px"
+      m.textContent = [p.status, (p.tasks || 0) + " task" + (p.tasks === 1 ? "" : "s"),
+        (p.resolved_suggestions || 0) + " resolved suggestion" + (p.resolved_suggestions === 1 ? "" : "s")].join(" · ")
+      card.appendChild(m)
+
+      const acts = document.createElement("div"); acts.className = "acts"; acts.style.marginTop = "10px"
+      if (p.role) {
+        const state = document.createElement("span"); state.className = "hint"
+        state.style.cssText = "align-self:center;color:" + (p.role === "carried" ? "var(--green)" : "var(--gold)")
+        state.textContent = p.role === "carried" ? "carried · folds into the child" : "dropped · withdrawn, closes here"
+        acts.appendChild(state)
+        // The Undeclare path. Without it a mis-click is permanent for the length of the
+        // session and the operator works around it by reopening the composer.
+        acts.appendChild(mkBtn("undeclare", "ghost mini", () => {
+          p.role = null; p.rationale = ""; p.suggested = false; paintMergeParents(); paintMergeConsequences()
+        }))
+      } else {
+        acts.appendChild(mkBtn("Carried", "btn-accept", () => { p.role = "carried"; paintMergeParents(); paintMergeConsequences() }))
+        acts.appendChild(mkBtn("Dropped", "btn-edit", () => { p.role = "dropped"; paintMergeParents(); paintMergeConsequences() }))
+        const u = document.createElement("span"); u.className = "hint"; u.style.alignSelf = "center"
+        u.textContent = "undeclared"
+        acts.appendChild(u)
+      }
+      card.appendChild(acts)
+
+      if (p.role === "dropped") {
+        card.appendChild(mgLabel("Why it stops here *"))
+        const ta = document.createElement("textarea"); ta.rows = 2; ta.value = p.rationale || ""
+        ta.placeholder = "Becomes the permanent retired_reason. A withdrawal, not a post-mortem."
+        if (p.suggested) ta.classList.add("drafted")
+        ta.addEventListener("input", () => {
+          p.rationale = ta.value
+          // §5: a suggested rationale blocks the commit until it has been edited. Clearing
+          // the flag on edit is what turns "offered" into "owned".
+          if (p.suggested) { p.suggested = false; ta.classList.remove("drafted"); paintMergeConsequences() }
+        })
+        card.appendChild(ta)
+      }
+      host.appendChild(card)
+    }
+  }
+
+  function mgPct(r) { return r == null ? "—" : Math.round(r * 100) + "%" }
+
+  function paintMergeConsequences() {
+    const host = MG.conseqHost; host.innerHTML = ""
+    const carried = MG.parents.filter((p) => p.role === "carried")
+    const dropped = MG.parents.filter((p) => p.role === "dropped")
+    const undeclared = MG.parents.filter((p) => !p.role)
+    const sum = (arr, k) => arr.reduce((a, p) => a + (p[k] || 0), 0)
+
+    const line = (label, main, side) => {
+      const row = document.createElement("div"); row.className = "cline"
+      const b = document.createElement("b"); b.textContent = label; row.appendChild(b)
+      const val = document.createElement("span"); val.className = "cval"
+      const m = document.createElement("span"); m.className = "cmain"; m.textContent = main; val.appendChild(m)
+      if (side) { const s = document.createElement("span"); s.className = "cside"; s.textContent = side; val.appendChild(s) }
+      row.appendChild(val); host.appendChild(row)
+    }
+
+    line("Closes", MG.parents.length + " propositions",
+      carried.length + " carried · " + dropped.length + " dropped" + (undeclared.length ? " · " + undeclared.length + " undeclared" : ""))
+    line("Carried forward", sum(carried, "tasks") + " tasks · " + sum(carried, "resolved_suggestions") + " resolved suggestions")
+    line("Left behind", sum(dropped, "tasks") + " tasks · " + sum(dropped, "resolved_suggestions") + " resolved suggestions",
+      dropped.length ? "(" + dropped.map((p) => p.title).join(", ") + ")" : "")
+
+    // Withdrawal rate, before → after. Only dropped parents move it: they take status
+    // 'dropped' and keep merged_into null, so they enter both halves of the ratio. Carried
+    // parents were 'active' (in neither half) and leave the view entirely, and the child is
+    // born 'active'. So both numerator and denominator grow by the dropped count.
+    const w = MG_WITHDRAWAL || { dropped: 0, closed: 0, withdrawal_rate: null }
+    const before = w.closed ? w.dropped / w.closed : null
+    const nd = dropped.length
+    const afterClosed = (w.closed || 0) + nd
+    const after = afterClosed ? ((w.dropped || 0) + nd) / afterClosed : null
+    const arrow = before == null || after == null ? "" : after > before ? "  ▲" : after < before ? "  ▼" : "  ·"
+    line("Withdrawal rate", mgPct(before) + " → " + mgPct(after) + arrow,
+      "band warns at 25% · provisional, no withdrawal history to read yet")
+
+    // authored_by is decided by what is actually committed, not by a default. If any drafted
+    // field is still untouched at commit, the text is the model's and says so.
+    const authored = MG.draftedFields.size ? "model" : "human"
+    line("Authored by", authored, MG.draftedFields.size ? "(" + MG.draftedFields.size + " drafted field(s) unedited)" : "(every field yours)")
+
+    if (MG_CANDS.length && MG_CANDS.every((c) => !c.resolved_suggestions)) {
+      const n = document.createElement("p"); n.className = "hint"; n.style.marginTop = "10px"
+      n.textContent = "Every proposition reads 0 resolved suggestions. fold_thesis is the only writer of suggestions.proposition_id and has never been called, so this column is accurate rather than broken. It starts counting the first time a thesis is folded."
+      host.appendChild(n)
+    }
+
+    const block = mgBlockers()
+    if (block.length) {
+      const b = document.createElement("p"); b.className = "hint"; b.style.cssText = "margin-top:10px;color:var(--reject)"
+      b.textContent = "Blocked: " + block.join(" · ")
+      host.appendChild(b)
+    }
+  }
+
+  // Every entry mirrors a guard in merge_propositions(), except the suggested-rationale
+  // rule, which is §5's and exists only here.
+  function mgBlockers() {
+    const out = []
+    if (MG.parents.length < 2) out.push("a merge needs two or more parents")
+    if (MG.parents.some((p) => !p.role)) out.push("every parent needs a declared role")
+    if (MG.parents.length && !MG.parents.some((p) => p.role === "carried")) {
+      out.push("at least one parent must be carried; carrying nothing is a batch of withdrawals")
+    }
+    if (MG.parents.some((p) => p.role === "dropped" && !(p.rationale || "").trim())) out.push("every dropped parent needs a rationale")
+    if (MG.parents.some((p) => p.role === "dropped" && p.suggested)) out.push("a suggested rationale must be edited before it can be committed")
+    return out
+  }
+
+  function mgFalsifier() {
+    const vals = {}
+    let filled = 0
+    for (const k of MG_FALSIFIER_KEYS) {
+      const v = ($("mg_f_" + k).value || "").trim()
+      if (v) { vals[k] = v; filled++ }
+    }
+    if (filled === 0) return { falsifier: null, error: null }
+    if (filled < MG_FALSIFIER_KEYS.length) {
+      const missing = MG_FALSIFIER_KEYS.filter((k) => !vals[k])
+      return { falsifier: null, error: "falsifier needs all five keys or none. Missing: " + missing.join(", ") + ". Clear the filled ones to merge without a falsifier." }
+    }
+    return { falsifier: vals, error: null }
+  }
+
+  // ---- brief out / draft in ----------------------------------------------------------
+  function mergeBrief() {
+    return {
+      ...MG_BRIEF_FRAMING,
+      parents: MG.parents.map((p) => ({
+        id: p.id,
+        title: p.title,
+        role: p.role || "undeclared",
+        status: p.status,
+        kind: p.kind,
+        product: p.product,
+        thesis_statement: p.thesis_statement,
+        tasks: p.tasks || 0,
+        resolved_suggestions: p.resolved_suggestions || 0,
+        has_falsifier: !!p.has_falsifier,
+      })),
+    }
+  }
+
+  async function copyMergeBrief() {
+    const text = JSON.stringify(mergeBrief(), null, 2)
+    try {
+      await navigator.clipboard.writeText(text)
+      show($("mg_out"), "Brief copied. Paste it into the model of your choice, then bring the JSON back with Paste draft.", true)
+    } catch (e) {
+      // Clipboard is blocked in some contexts. Falling back to a selectable textarea
+      // rather than losing the brief.
+      const slot = $("mg_pasteSlot"); slot.dataset.open = "1"; slot.innerHTML = ""
+      slot.appendChild(mgLabel("Brief · copy this by hand"))
+      const ta = document.createElement("textarea"); ta.rows = 10; ta.value = text; ta.readOnly = true
+      slot.appendChild(ta); ta.select()
+    }
+  }
+
+  function toggleMergePaste() {
+    const slot = $("mg_pasteSlot")
+    if (slot.dataset.open === "1") { slot.innerHTML = ""; slot.dataset.open = "0"; return }
+    slot.dataset.open = "1"; slot.innerHTML = ""
+    slot.appendChild(mgLabel("Paste the model's JSON reply"))
+    const ta = document.createElement("textarea"); ta.id = "mg_paste"; ta.rows = 8
+    ta.placeholder = '{ "title": "...", "thesis_statement": "...", "falsifier": {...}, "parents": [{"id": "...", "rationale": "..."}] }'
+    slot.appendChild(ta)
+    const acts = document.createElement("div"); acts.className = "acts"
+    acts.appendChild(mkBtn("Apply draft", "btn-accept", applyMergeDraft))
+    slot.appendChild(acts)
+  }
+
+  // Tolerant on the way in, strict on the way out. Models wrap JSON in prose or a code
+  // fence, so the outermost object is extracted rather than demanded. What gets applied is
+  // then validated: an unknown parent id is reported, never silently dropped, and a partial
+  // falsifier is refused here as well as by the RPC.
+  function applyMergeDraft() {
+    const raw = ($("mg_paste").value || "").trim()
+    if (!raw) { show($("mg_out"), "Nothing pasted.", false); return }
+    let obj
+    try {
+      const a = raw.indexOf("{"), b = raw.lastIndexOf("}")
+      if (a < 0 || b <= a) throw new Error("no JSON object found in the paste")
+      obj = JSON.parse(raw.slice(a, b + 1))
+    } catch (e) { show($("mg_out"), "Could not read that as JSON: " + e.message, false); return }
+
+    const applied = [], skipped = []
+    if (typeof obj.title === "string" && obj.title.trim()) {
+      $("mg_title").value = obj.title.trim(); mgMarkDrafted($("mg_title"), "title"); applied.push("title")
+    }
+    if (obj.kind === "product" || obj.kind === "project") { $("mg_kind").value = obj.kind; applied.push("kind") }
+    if (typeof obj.thesis_statement === "string" && obj.thesis_statement.trim()) {
+      $("mg_thesis").value = obj.thesis_statement.trim(); mgMarkDrafted($("mg_thesis"), "thesis"); applied.push("thesis")
+    }
+    if (obj.falsifier && typeof obj.falsifier === "object") {
+      const have = MG_FALSIFIER_KEYS.filter((k) => typeof obj.falsifier[k] === "string" && obj.falsifier[k].trim())
+      if (have.length === MG_FALSIFIER_KEYS.length) {
+        for (const k of MG_FALSIFIER_KEYS) {
+          const el = $("mg_f_" + k); el.value = String(obj.falsifier[k]).trim(); mgMarkDrafted(el, "falsifier." + k)
+        }
+        applied.push("falsifier")
+      } else {
+        skipped.push("falsifier (" + have.length + " of 5 keys; all five or none)")
+      }
+    }
+    for (const dp of Array.isArray(obj.parents) ? obj.parents : []) {
+      const p = MG.parents.find((x) => x.id === (dp && dp.id))
+      if (!p) { skipped.push("parent id " + ((dp && dp.id) || "(missing)") + " is not in this merge"); continue }
+      if (typeof dp.rationale !== "string" || !dp.rationale.trim()) continue
+      if (p.role !== "dropped") { skipped.push("rationale for " + p.title + " (role is " + (p.role || "undeclared") + ", not dropped)"); continue }
+      // Marked suggested, which blocks the commit until it is edited.
+      p.rationale = dp.rationale.trim(); p.suggested = true; applied.push("rationale · " + p.title)
+    }
+    paintMergeParents(); paintMergeConsequences()
+    const msg = (applied.length ? "Applied: " + applied.join(", ") + "." : "Nothing applied.") +
+      (skipped.length ? "\nSkipped: " + skipped.join("; ") + "." : "") +
+      "\nDrafted fields read italic gold. Suggested rationales block the commit until you edit them."
+    show($("mg_out"), msg, applied.length > 0)
+  }
+
+  async function commitMerge() {
+    const title = ($("mg_title").value || "").trim()
+    if (!title) { show($("mg_out"), "The child needs a title.", false); return }
+    const block = mgBlockers()
+    if (block.length) { show($("mg_out"), "Blocked: " + block.join(" · "), false); return }
+    const f = mgFalsifier()
+    if (f.error) { show($("mg_out"), f.error, false); return }
+
+    show($("mg_out"), "Committing…", true)
+    try {
+      const r = await api("merge_propositions", {
+        title,
+        kind: $("mg_kind").value,
+        thesis_statement: ($("mg_thesis").value || "").trim() || null,
+        falsifier: f.falsifier,
+        parents: MG.parents.map((p) => ({ id: p.id, role: p.role, rationale: p.role === "dropped" ? p.rationale.trim() : null })),
+        authored_by: MG.draftedFields.size ? "model" : "human",
+      })
+      const w = r.withdrawal || {}
+      const carried = MG.parents.filter((p) => p.role === "carried")
+      const dropped = MG.parents.filter((p) => p.role === "dropped")
+      // The receipt. Post-state read back from the response, not asserted from the request.
+      show($("mg_out"), [
+        "Merged. child_id: " + r.child_id,
+        carried.length + " carried (" + carried.map((p) => p.title).join(", ") + ")",
+        dropped.length ? dropped.length + " withdrawn (" + dropped.map((p) => p.title).join(", ") + ")" : "0 withdrawn",
+        "falsifier: " + (f.falsifier ? "declared" : "none — the child reads unfalsified until one is written"),
+        "authored_by: " + (MG.draftedFields.size ? "model" : "human"),
+        "withdrawal now: " + (w.dropped ?? "?") + "/" + (w.closed ?? "?") + " = " + mgPct(w.withdrawal_rate == null ? null : Number(w.withdrawal_rate)),
+        r.chain_note || "",
+      ].filter(Boolean).join("\n"), true)
+      MG_WITHDRAWAL = r.withdrawal || MG_WITHDRAWAL
+      loadMergeCandidates(); loadPropositions()
+    } catch (e) { show($("mg_out"), e.message, false) }
+  }
+
+  // ---- Lineage ----------------------------------------------------------------------
+  // Carried parents are reachable through merged_into. Dropped parents are not, by design,
+  // so their roles and rationales come out of the chained merge event. Both are rendered as
+  // branches of the same fold: a withdrawal is where work stopped, not where it failed.
+  async function openLineage(propId, mount) {
+    if (mount.dataset.open === "1") { mount.innerHTML = ""; mount.dataset.open = "0"; return }
+    mount.dataset.open = "1"; mount.innerHTML = '<p class="hint">reading lineage…</p>'
+    let r
+    try { r = await api("proposition_lineage", { proposition_id: propId }) }
+    catch (e) { mount.innerHTML = '<p class="out err" style="display:block">' + esc(e.message) + "</p>"; return }
+    mount.innerHTML = ""
+
+    const roles = r.declared_roles || null
+    const carried = r.carried_parents || []
+    if (!carried.length && !roles) {
+      mount.innerHTML = '<p class="hint">No merge in this proposition\'s history. It was created directly, not folded from parents.</p>'
+      return
+    }
+
+    const byId = {}
+    for (const c of carried) byId[c.id] = c
+    const rows = []
+    for (const c of carried) rows.push({ id: c.id, title: c.title, role: "carried", status: c.status, rationale: null })
+    for (const d of Array.isArray(roles) ? roles : []) {
+      if (d.role !== "dropped") continue
+      rows.push({ id: d.id, title: (byId[d.id] || {}).title || d.id, role: "dropped", status: "dropped", rationale: d.rationale || null })
+    }
+    if (!rows.length) { mount.innerHTML = '<p class="hint">Merge event present but no parents recorded on it.</p>'; return }
+
+    for (const row of rows) {
+      const card = document.createElement("div")
+      card.className = "mg-parent " + (row.role === "carried" ? "is-carried" : "is-dropped")
+      const t = document.createElement("div"); t.style.cssText = "font-family:'IBM Plex Mono',monospace;font-size:12.5px"
+      t.textContent = row.title
+      card.appendChild(t)
+      const m = document.createElement("div"); m.className = "hint"; m.style.marginTop = "3px"
+      m.style.color = row.role === "carried" ? "var(--green)" : "var(--gold)"
+      m.textContent = row.role === "carried" ? "carried · its work continues here" : "withdrawn · the branch stops here"
+      card.appendChild(m)
+      if (row.rationale) {
+        const rr = document.createElement("div"); rr.style.cssText = "font-style:italic;color:var(--ink-dim);margin-top:6px;font-size:13px"
+        rr.textContent = "“" + row.rationale + "”"
+        card.appendChild(rr)
+      }
+      mount.appendChild(card)
+    }
+    if (r.merge_event) {
+      const src = document.createElement("p"); src.className = "hint"; src.style.marginTop = "8px"
+      src.textContent = "Roles read from the chained merge event of " + String(r.merge_event.created_at).slice(0, 10) +
+        ". Dropped parents keep merged_into null, so this is the only record of them, and it cannot be quietly revised."
+      mount.appendChild(src)
+    }
   }
 
   $("unlockBtn").addEventListener("click", unlock)
@@ -2626,6 +3189,16 @@
   $("propRefresh").addEventListener("click", loadPropositions)
   $("p_createBtn").addEventListener("click", createProposition)
   $("composeClose").addEventListener("click", closeCompose)
+  // Candidates load on first open of the picker, not on every visit to the tab — the op
+  // reads three tables and the picker is closed most of the time.
+  $("mergePicker").addEventListener("toggle", () => {
+    if ($("mergePicker").open && !MG_CANDS.length) loadMergeCandidates()
+  })
+  $("mg_refreshBtn").addEventListener("click", loadMergeCandidates)
+  $("mg_openBtn").addEventListener("click", openMergeComposer)
+  $("mergeClose").addEventListener("click", closeMergeComposer)
+  $("mergeModal").addEventListener("click", (e) => { if (e.target === $("mergeModal")) closeMergeComposer() })
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("mergeModal").classList.contains("show")) closeMergeComposer() })
   $("rm_btn").addEventListener("click", (e) => { e.preventDefault(); runFinder({ precise: true }) })
   $("rm_q").addEventListener("input", onFinderInput)
   for (const id of ["rm_q", "rm_email", "rm_linkedin", "rm_org"]) {

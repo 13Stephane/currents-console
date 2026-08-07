@@ -33,7 +33,8 @@ h1 em{font-style:italic;color:var(--gold);font-weight:300}
 .err{color:var(--amber)}
 .hidden{display:none}
 /* vitals */
-.vitals{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--line);border:1px solid var(--line);margin-bottom:14px}
+.vitals{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--line);border:1px solid var(--line);margin-bottom:14px}
+@media(max-width:1200px){.vitals{grid-template-columns:repeat(3,1fr)}}
 .vital{background:var(--bg);padding:16px 18px}
 .vital .k{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:6px}
 .vital .v{font-size:24px;font-weight:400}
@@ -220,10 +221,23 @@ function renderVitals(v){
   const cov = v.calibration_coverage || {};
   const covOk = (cov.green||0)+(cov.amber||0);
   const oldest = v.oldest_open;
+  // Withdrawal rate (§4). Sits next to calibration coverage because the accepted
+  // resolution-event decision puts it adjacent to accuracy wherever accuracy appears.
+  // The denominator is shown, not hidden: at closed=1 the percentage is arithmetic, not
+  // evidence, and the sub-line is what says so. A null rate means nothing has closed yet;
+  // a null object means the read failed, which is a different fact.
+  const wd = v.withdrawal;
+  const wRate = wd && wd.withdrawal_rate != null ? wd.withdrawal_rate : null;
+  const wWarn = typeof v.withdrawal_warn_at === "number" ? v.withdrawal_warn_at : 0.25;
+  const wMain = wRate == null ? "—" : Math.round(wRate*100) + "%";
+  const wSub = !wd ? "unreadable"
+    : wd.closed ? `${wd.dropped} of ${wd.closed} closed`
+    : "none closed yet";
   el("vitals").innerHTML = `
     <div class="vital"><div class="k">disposal / brief</div><div class="v">${fmt(v.disposal_rate_per_brief,1)} <small>14d</small></div></div>
     <div class="vital"><div class="k">resolved outcomes</div><div class="v">${v.resolved_total} <small>all classes</small></div></div>
     <div class="vital"><div class="k">calibration coverage</div><div class="v">${covOk}/${cov.classes_total||0} <small>≥ amber</small></div></div>
+    <div class="vital ${wRate!=null && wRate>=wWarn ? 'alarm' : ''}"><div class="k">withdrawal rate</div><div class="v">${wMain} <small>${wSub}</small></div></div>
     <div class="vital ${oldest && oldest.age_days>=30?'alarm':''}"><div class="k">oldest open claim</div><div class="v">${oldest?Math.round(oldest.age_days)+'d':'—'} <small>active debt</small></div></div>
     <div class="vital"><div class="k">lapsed · unscored</div><div class="v">${v.lapsed_total} <small>expired, never scored</small></div></div>`;
   renderSpark(v.disposal_sparkline || []);
