@@ -496,6 +496,18 @@
         <button data-tsort="recent" class="active" title="Most recently updated first (grouped by proposition)">Recent</button>
         <button data-tsort="donext" title="What to work on next: horizon (now → later), open before stalled, older rises. One cross-proposition list.">Do next</button>
       </div>
+      <!-- Day 139 · bulk filing bar (docs/spec_bulk_task_filing_2026-08-09.md). Hidden until
+           at least one task is ticked. No confirm dialog: filing is curation and reversible in
+           effect via "detach", and a modal on a curation action trains the operator to dismiss
+           modals. -->
+      <div id="taskSelBar" class="hidden" style="margin-top:12px;padding:10px 12px;border:1px solid var(--gold);border-radius:6px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+        <strong id="taskSelCount" style="color:var(--gold)"></strong>
+        <span class="hint" style="margin:0">file into</span>
+        <select id="taskSelTarget" style="font-size:12px;padding:3px 6px"></select>
+        <button class="mini" id="taskSelApply">File</button>
+        <button class="ghost mini" id="taskSelClear">clear selection</button>
+        <span id="taskSelOut" class="out" style="flex-basis:100%;margin:0"></span>
+      </div>
       <div id="tasksList" style="margin-top:12px"></div>
     </div>
     </div><!-- /tasksView -->
@@ -1494,6 +1506,88 @@
     }
   }
 
+  // Task restructuring (Day 140): reframe's N→M generalisation. The model proposes fewer,
+  // evolved tasks; nothing is written until the operator accepts the whole set.
+  //
+  // ALL-OR-NOTHING BY DESIGN (spec D2) — there is deliberately no per-successor tick. The model
+  // proposes a PARTITION of the task list, so a successor's quality depends on what the others
+  // absorbed; accepting a subset judges each one against a partition that will not exist. The
+  // successors are editable in place, exactly as reframe's rewordings are: you tune the wording
+  // before disposing it in, you do not pick and choose which folds happen.
+  async function openRestructure(pid, mount) {
+    mount.innerHTML = '<p class="hint">Reading every open task in this proposition…</p>'
+    let r
+    try { r = await api("propose_task_restructure", { proposition_id: pid }) }
+    catch (e) { mount.innerHTML = '<p class="out err" style="display:block">' + esc(e.message) + "</p>"; return }
+    mount.innerHTML = ""
+
+    const lab = document.createElement("div"); lab.className = "hint"
+    lab.style.cssText = "text-transform:uppercase;letter-spacing:.1em;color:var(--gold);margin-bottom:8px"
+    lab.textContent = r.open_count + " open → " + r.successors.length + " proposed · edit any successor, then accept the whole set"
+    mount.appendChild(lab)
+
+    const edits = []
+    for (const s of r.successors) {
+      const row = document.createElement("div")
+      row.style.cssText = "padding:8px 0;border-top:1px solid var(--line)"
+      const ta = document.createElement("textarea"); ta.value = s.action
+      ta.style.cssText = "width:100%;min-height:56px;margin:0"
+      row.appendChild(ta)
+      edits.push({ ta, replaces: s.replaces })
+      if (s.why) {
+        const w = document.createElement("div"); w.className = "hint"; w.style.marginTop = "2px"
+        w.textContent = s.why; row.appendChild(w)
+      }
+      // What is being left behind, shown before committing — the merge composer's
+      // consequences-panel idiom, which exists for exactly this job.
+      for (const a of s.replaces_actions) {
+        const d = document.createElement("div"); d.className = "hint"
+        d.style.cssText = "margin-top:3px;text-decoration:line-through;opacity:.65"
+        d.textContent = a; row.appendChild(d)
+      }
+      mount.appendChild(row)
+    }
+
+    // Tasks the model left alone stay open and untouched. Reported rather than passed over in
+    // silence: a restructure that quietly covered 8 of 11 would read as having covered all 11.
+    if (r.untouched.length) {
+      const u = document.createElement("div"); u.className = "hint"
+      u.style.cssText = "margin-top:10px;padding-top:8px;border-top:1px solid var(--line)"
+      u.textContent = r.untouched.length + " task" + (r.untouched.length === 1 ? "" : "s") +
+        " left untouched and still open: " + r.untouched.map((t) => t.current_action).join(" · ")
+      mount.appendChild(u)
+    }
+
+    const warn = document.createElement("div"); warn.className = "hint"
+    warn.style.cssText = "margin-top:10px;color:var(--gold)"
+    warn.textContent = "Accepting folds " + edits.reduce((n, e) => n + e.replaces.length, 0) +
+      " tasks into " + edits.length + ". Folded tasks keep their history and name their successors. There is no undo."
+    mount.appendChild(warn)
+
+    const acts = document.createElement("div"); acts.className = "acts"; acts.style.marginTop = "10px"
+    const out = document.createElement("div"); out.className = "out"
+    const go = mkBtn("Accept all " + edits.length, "btn-accept", async () => {
+      const successors = edits.map((e) => ({ action: e.ta.value.trim(), replaces: e.replaces }))
+      if (successors.some((s) => !s.action)) { alert("A successor is empty — edit it first."); return }
+      go.disabled = true; go.textContent = "…"
+      try {
+        const res = await api("apply_task_restructure", { proposition_id: r.proposition_id, successors })
+        mount.innerHTML = ""
+        show(out, (res.result?.replaced ?? 0) + " folded into " + (res.result?.successors ?? 0) + ".", true)
+        mount.appendChild(out)
+        await openProposition(pid)
+      } catch (e) {
+        go.disabled = false; go.textContent = "Accept all " + edits.length
+        // The RPC is one transaction, so a failure means NOTHING was folded. Say so — the
+        // operator's next question is always "what state am I in now".
+        show(out, e.message + " — nothing was folded (the call is all-or-nothing).", false)
+      }
+    })
+    acts.appendChild(go)
+    acts.appendChild(mkBtn("Discard", "btn-snooze", () => { mount.innerHTML = "" }))
+    mount.appendChild(acts); mount.appendChild(out)
+  }
+
   function selectSug(id) {
     SELID = id
     renderRail()
@@ -1914,8 +2008,17 @@
   // writes a chained feedback_event (the grade-3 outcome signal); a pure action-text amend writes none.
   let TASK_PROPS = []   // Day 120: proposition summaries, cached for the per-task assign picker
 
+  // Day 139 — bulk filing selection (docs/spec_bulk_task_filing_2026-08-09.md).
+  // Hand-picked, not filtered-set: decided on live data — 6 unassigned tasks against a Tasks tab
+  // with no filters at all, so a "file everything in this view" action would have meant building
+  // filter infrastructure first to serve a pool of six. Revisit past ~30 unassigned.
+  const TASK_SEL = new Set()
+
   async function loadTasks() {
     const host = $("tasksList"); host.textContent = "loading…"
+    // Selection does not survive a reload: the ids would still resolve, but the operator's
+    // mental picture of "what is ticked" would not, and bulk filing ships with no undo.
+    TASK_SEL.clear()
     const all = $("tasksAll") && $("tasksAll").checked
     try {
       const payload = all ? { status: ["open", "stalled", "completed", "abandoned"] } : {}
@@ -1949,8 +2052,54 @@
   // Day 120: group by proposition membership. Standalone tasks (proposition_id null) are
   // legitimate one-off work, but were invisible/unattachable — surface them as "Unassigned"
   // with a per-card picker to file them into a proposition (or leave them standalone).
+  // Day 139 — the bulk-filing bar. Appears only when something is ticked: a permanently visible
+  // action bar on a screen whose normal use is one task at a time is noise, and this operation
+  // has no undo, so it should be present exactly when it is being used.
+  function renderTaskSelBar() {
+    const bar = $("taskSelBar")
+    if (!bar) return
+    const n = TASK_SEL.size
+    bar.classList.toggle("hidden", n === 0)
+    if (!n) return
+    $("taskSelCount").textContent = n + (n === 1 ? " task selected" : " tasks selected")
+    const sel = $("taskSelTarget")
+    // Rebuild the target list each time — TASK_PROPS may have been refreshed underneath us.
+    sel.innerHTML = ""
+    const none = document.createElement("option")
+    none.value = ""; none.textContent = "— detach (no proposition) —"
+    sel.appendChild(none)
+    for (const p of TASK_PROPS) {
+      const o = document.createElement("option"); o.value = p.id; o.textContent = p.title
+      sel.appendChild(o)
+    }
+  }
+
+  // One RPC, one transaction: all listed tasks move or none do. Chosen over looping the
+  // Day-120 single-task call precisely because bulk filing has no undo (spec D1/D3) — a batch
+  // that half-applied would leave a state with no recovery path, since `tasks` keeps no history
+  // of the previous proposition_id.
+  async function bulkFileTasks() {
+    const ids = [...TASK_SEL]
+    if (!ids.length) return
+    const target = $("taskSelTarget").value || null
+    const out = $("taskSelOut")
+    out.textContent = "filing…"
+    try {
+      const r = await api("set_task_propositions", { task_ids: ids, proposition_id: target })
+      const moved = r.tasks_moved ?? ids.length
+      show(out, moved + (moved === 1 ? " task filed." : " tasks filed."), true)
+      TASK_SEL.clear()
+      await loadTasks()
+    } catch (e) {
+      // The RPC is atomic, so a failure means NOTHING moved. Say so — the operator's next
+      // question is always "what state am I in now", and the answer is "unchanged".
+      show(out, e.message + " — nothing was moved (the call is all-or-nothing).", false)
+    }
+  }
+
   function renderTasks(tasks) {
     const host = $("tasksList"); host.innerHTML = ""
+    renderTaskSelBar()
     if (!tasks.length) { host.innerHTML = '<p class="hint">No tasks. Accept or edit a suggestion in Dispose to spawn one.</p>'; return }
     if (TASK_SORT === "donext") {
       const ranked = tasks.slice().sort((a, b) => doNextScore(b) - doNextScore(a))
@@ -1985,7 +2134,24 @@
     const card = document.createElement("div"); card.className = "pending-card"
 
     const head = document.createElement("div"); head.className = "who"
-    head.textContent = t.current_action || "(no action)"
+    // Day 139 — bulk filing (docs/spec_bulk_task_filing_2026-08-09.md). Selection checkbox on
+    // non-terminal tasks only, matching the action row below: a completed task has nowhere to
+    // be filed to that matters. Same mg-cb idiom as the merge composer so the console has one
+    // multi-select pattern rather than two.
+    if (t.status === "open" || t.status === "stalled") {
+      const cb = document.createElement("input")
+      cb.type = "checkbox"; cb.className = "mg-cb"; cb.value = t.id
+      cb.style.cssText = "margin-right:8px;vertical-align:middle"
+      cb.title = "Select for bulk filing"
+      cb.checked = TASK_SEL.has(t.id)
+      cb.addEventListener("click", (e) => e.stopPropagation())
+      cb.addEventListener("change", () => {
+        if (cb.checked) TASK_SEL.add(t.id); else TASK_SEL.delete(t.id)
+        renderTaskSelBar()
+      })
+      head.appendChild(cb)
+    }
+    head.appendChild(document.createTextNode(t.current_action || "(no action)"))
     card.appendChild(head)
 
     const subjBits = []
@@ -2236,6 +2402,15 @@
       hz.appendChild(col)
     }
     host.appendChild(hz)
+
+    // ⟳ Restructure tasks (Day 140) — N open tasks become M < N evolved successors. A sounding
+    // first: the proposal writes nothing until the whole set is accepted. Rendered
+    // unconditionally rather than hidden below two open tasks, so the RPC stays the single
+    // invariant holder and the client does not grow a second copy of the rule.
+    const rsSlot = document.createElement("div"); rsSlot.style.margin = "10px 0 0"
+    const rsBtn = mkBtn("⟳ Restructure tasks", "btn-edit", () => openRestructure(p.id, rsSlot))
+    rsBtn.style.marginTop = "0"
+    host.appendChild(rsBtn); host.appendChild(rsSlot)
 
     // folded theses
     host.appendChild(propSection("Theses folded in · " + p.theses.length))
@@ -3176,6 +3351,9 @@
   $("navTasks").addEventListener("click", showTasks)
   $("tasksRefresh").addEventListener("click", loadTasks)
   $("tasksAll").addEventListener("change", loadTasks)
+  // Day 139 · bulk filing
+  $("taskSelApply").addEventListener("click", bulkFileTasks)
+  $("taskSelClear").addEventListener("click", () => { TASK_SEL.clear(); renderTasks(TASKS_CACHE) })
   // Day 129 (#5): Tasks "Recent" vs "Do next" ordering — re-renders from cache, no refetch.
   $("taskSortNav").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
     TASK_SORT = b.dataset.tsort
