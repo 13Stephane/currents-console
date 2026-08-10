@@ -1506,6 +1506,56 @@
     }
   }
 
+  // STEP 1 (Day 140, from first-use feedback): critique the proposition's description against
+  // the tasks actually under it, and offer replacements derived FROM those tasks. Writes
+  // nothing until you dispose one into thesis_statement, which is the same gesture as Reframe.
+  // Run this before Restructure: step 2 anchors on this description, and an unreviewed
+  // description is exactly what is stale when the tasks have drifted enough to need reshaping.
+  async function openDescriptionReview(pid, mount) {
+    mount.innerHTML = '<p class="hint">Reading the open tasks and the current description…</p>'
+    let r
+    try { r = await api("propose_proposition_review", { proposition_id: pid }) }
+    catch (e) { mount.innerHTML = '<p class="out err" style="display:block">' + esc(e.message) + "</p>"; return }
+    mount.innerHTML = ""
+
+    const lab = document.createElement("div"); lab.className = "hint"
+    lab.style.cssText = "text-transform:uppercase;letter-spacing:.1em;color:var(--gold);margin-bottom:8px"
+    lab.textContent = "step 1 · description reviewed against " + r.open_count +
+      (r.open_count === 1 ? " open task" : " open tasks")
+    mount.appendChild(lab)
+
+    if (r.critique) {
+      const c = document.createElement("div")
+      c.style.cssText = "padding:8px 0;border-top:1px solid var(--line);color:var(--ink-dim);font-size:13.5px"
+      c.textContent = r.critique
+      mount.appendChild(c)
+    }
+
+    for (const o of r.options) {
+      const row = document.createElement("div")
+      row.style.cssText = "display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)"
+      const txt = document.createElement("div"); txt.style.flex = "1"
+      const ta = document.createElement("textarea"); ta.value = o.text
+      ta.style.cssText = "width:100%;font-style:italic;min-height:52px;margin:0"
+      txt.appendChild(ta)
+      if (o.why) { const w = document.createElement("div"); w.className = "hint"; w.style.marginTop = "2px"; w.textContent = o.why; txt.appendChild(w) }
+      row.appendChild(txt)
+      const use = mkBtn("Use", "btn-accept", async () => {
+        const val = ta.value.trim()
+        if (!val) { alert("Empty — edit the description first."); return }
+        use.disabled = true; use.textContent = "…"
+        try {
+          await api("update_proposition", { proposition_id: r.proposition_id, thesis_statement: val })
+          mount.innerHTML = '<p class="hint">Description updated. Restructure tasks now reads it.</p>'
+          await openProposition(pid)
+        } catch (e) { use.disabled = false; use.textContent = "Use"; alert(e.message) }
+      })
+      use.style.cssText = "margin-top:0;padding:5px 12px;font-size:11px"
+      row.appendChild(use)
+      mount.appendChild(row)
+    }
+  }
+
   // Task restructuring (Day 140): reframe's N→M generalisation. The model proposes fewer,
   // evolved tasks; nothing is written until the operator accepts the whole set.
   //
@@ -1523,8 +1573,20 @@
 
     const lab = document.createElement("div"); lab.className = "hint"
     lab.style.cssText = "text-transform:uppercase;letter-spacing:.1em;color:var(--gold);margin-bottom:8px"
-    lab.textContent = r.open_count + " open → " + r.successors.length + " proposed · edit any successor, then accept the whole set"
+    // The reduction is stated as a number, not implied by two counts. Day 140's first real run
+    // returned 7 successors for 8 tasks — technically "fewer", actually six rewordings and one
+    // merge — and was accepted before anyone did the subtraction. Make the subtraction the
+    // headline so a near-copy proposal is obvious at a glance.
+    const cut = r.open_count - r.successors.length
+    lab.textContent = "step 2 · " + r.open_count + " open → " + r.successors.length +
+      " proposed · a reduction of " + cut + (cut === 1 ? " task" : " tasks")
     mount.appendChild(lab)
+    if (cut <= 1) {
+      const weak = document.createElement("div"); weak.className = "hint"
+      weak.style.cssText = "margin-bottom:8px;color:var(--reject)"
+      weak.textContent = "That is barely a restructure. Discard and re-run, or review the description first — a near-copy usually means the model had no better grouping to find."
+      mount.appendChild(weak)
+    }
 
     const edits = []
     for (const s of r.successors) {
@@ -2033,7 +2095,11 @@
     } catch (e) { host.textContent = e.message }
   }
 
-  const TASK_STATUS_COLOR = { open: "var(--gold)", stalled: "var(--ink-dim)", completed: "var(--green)", abandoned: "var(--reject)" }
+  // `folded` and `released` (Day 140) are terminal but NOT failures — a folded task's intent
+  // is carried by its successors, a released one left with its container. They must not read
+  // in the same colour as `abandoned`, which is the one terminal status that does mean the
+  // work was given up. That distinction is the whole point of having separate verbs.
+  const TASK_STATUS_COLOR = { open: "var(--gold)", stalled: "var(--ink-dim)", completed: "var(--green)", abandoned: "var(--reject)", folded: "var(--ink-dim)", released: "var(--ink-dim)" }
 
   // Day 129 (item #5): "Do next" prioritization. Recent = the Day-120 grouped view (updated_at).
   // Do next = one cross-proposition list ranked by a transparent composite: horizon is the
@@ -2249,6 +2315,9 @@
   const STAGE_COLOR = { considering: "var(--ink-faint)", latent: "var(--ink-dim)", active: "var(--gold)", committed: "var(--green)", declined: "var(--reject)", dropped: "var(--reject)" }
   const HORIZONS = ["now", "next", "later"]
   let PROP_OPEN = null
+  // Retired tasks are collapsed by default on the proposition board (Day 140). Session state,
+  // deliberately not persisted: the useful default is "show me the live work", every time.
+  let PROP_SHOW_DONE = false
 
   async function loadPropositions() {
     const host = $("propList"); host.textContent = "loading…"
@@ -2392,25 +2461,48 @@
 
     // tasks by horizon
     host.appendChild(propSection("Tasks · by horizon"))
+    // Terminal tasks are hidden from the lanes by default (Day 140, from first-use feedback:
+    // "all abandoned tasks still show and pollute the screen"). `get_proposition` returns every
+    // task regardless of status — read live, it has no status filter — and on a worked
+    // proposition the terminal ones outnumber the live work several to one. Folding made this
+    // worse, since a restructure retires N rows at a stroke.
+    //
+    // Filtered HERE rather than in the RPC: get_proposition is a proven read path with other
+    // callers, and the two propose ops query `tasks` directly with status='open', so neither
+    // needs it. The count stays visible and one click brings them back — hidden, not dropped.
+    const liveTasks = p.tasks.filter((x) => x.status === "open" || x.status === "stalled")
+    const doneTasks = p.tasks.filter((x) => x.status !== "open" && x.status !== "stalled")
     const hz = document.createElement("div"); hz.style.cssText = "display:flex;gap:10px;flex-wrap:wrap"
     for (const horizon of HORIZONS) {
       const col = propColumn(horizon, null)
       makeDropTarget(col, "task", horizon, (taskId, to) => moveTaskHorizon(taskId, to))
-      const lane = p.tasks.filter((x) => x.horizon === horizon)
+      const lane = (PROP_SHOW_DONE ? p.tasks : liveTasks).filter((x) => x.horizon === horizon)
       if (!lane.length) { const e = document.createElement("div"); e.className = "hint"; e.textContent = "—"; col.appendChild(e) }
       for (const t of lane) col.appendChild(taskMini(t))
       hz.appendChild(col)
     }
     host.appendChild(hz)
+    if (doneTasks.length) {
+      const byStatus = {}
+      for (const t of doneTasks) byStatus[t.status] = (byStatus[t.status] || 0) + 1
+      const summary = Object.entries(byStatus).map(([s, n]) => n + " " + s).join(" · ")
+      const tog = mkBtn((PROP_SHOW_DONE ? "hide" : "show") + " " + doneTasks.length + " retired · " + summary,
+        "btn-snooze", () => { PROP_SHOW_DONE = !PROP_SHOW_DONE; renderPropDetail(p) })
+      tog.style.cssText = "margin-top:8px;padding:4px 10px;font-size:11px"
+      host.appendChild(tog)
+    }
 
-    // ⟳ Restructure tasks (Day 140) — N open tasks become M < N evolved successors. A sounding
-    // first: the proposal writes nothing until the whole set is accepted. Rendered
-    // unconditionally rather than hidden below two open tasks, so the RPC stays the single
-    // invariant holder and the client does not grow a second copy of the rule.
+    // Two-step flow (Day 140). Step 1 re-derives the description from the tasks; step 2
+    // restructures the tasks against it. Ordered left to right, and step 2 reads whatever
+    // step 1 wrote, so running them in order is the only coupling they need.
+    // Both render unconditionally, so the server stays the single invariant holder and the
+    // client does not grow a second copy of the "needs 2+ open tasks" rule.
     const rsSlot = document.createElement("div"); rsSlot.style.margin = "10px 0 0"
+    const dsBtn = mkBtn("⟳ Review description", "btn-edit", () => openDescriptionReview(p.id, rsSlot))
+    dsBtn.style.marginTop = "0"
     const rsBtn = mkBtn("⟳ Restructure tasks", "btn-edit", () => openRestructure(p.id, rsSlot))
-    rsBtn.style.marginTop = "0"
-    host.appendChild(rsBtn); host.appendChild(rsSlot)
+    rsBtn.style.cssText = "margin-top:0;margin-left:8px"
+    host.appendChild(dsBtn); host.appendChild(rsBtn); host.appendChild(rsSlot)
 
     // folded theses
     host.appendChild(propSection("Theses folded in · " + p.theses.length))
