@@ -562,7 +562,7 @@
       <div class="nav" id="taskSortNav" style="margin-bottom:12px;align-items:center">
         <span class="hint" style="margin:0 8px 0 0">order</span>
         <button data-tsort="recent" class="active" title="Most recently updated first (grouped by proposition)">Recent</button>
-        <button data-tsort="donext" title="What to work on next: horizon (now → later), open before stalled, older rises. One cross-proposition list.">Do next</button>
+        <button data-tsort="donext" title="What to work on next: horizon (now → later), older work rising. One cross-proposition list.">Do next</button>
       </div>
       <!-- Day 139 · bulk filing bar (docs/spec_bulk_task_filing_2026-08-09.md). Hidden until
            at least one task is ticked. No confirm dialog: filing is curation and reversible in
@@ -1008,7 +1008,7 @@
       // claim people are being matched to. Falling back to the bare title would rank
       // against a label rather than an intent.
       add("Propositions", pr.propositions || [], "p", (p) => [p.title, p.thesis_statement].filter(Boolean).join(". "))
-      add("Open tasks", (tr.tasks || []).filter((t) => t.status === "open" || t.status === "stalled"),
+      add("Open tasks", (tr.tasks || []).filter((t) => t.status === "open"),
         "t", (t) => t.current_action || "")
     } catch (_) { /* free-text path still works */ }
   }
@@ -1028,11 +1028,23 @@
   function showDispose() { SUG_TRIGGER = null; SUG_TRIGGER_TITLE = null; setNav("navDispose"); loadSuggestions(); ensureTaskProps() }
 
   // The accept panel offers a proposition to file into, so the Theses tab needs the list too.
-  // Fetched once per session rather than per accept: it is a small read and the panel opens
-  // mid-decision, where a spinner in a select is worse than a slightly stale title.
+  // Prefetched on entering the tab so the panel usually opens with it already in hand; the
+  // panel awaits it regardless. Returns whether the list is usable, because "the fetch failed"
+  // and "you own no propositions" produce the same empty select and must not read the same:
+  // filing standalone is a real choice, and it must never be the only one offered by accident.
+  // TASK_PROPS_INFLIGHT holds the promise, not a boolean: the prefetch from showDispose and
+  // the panel's own await are two callers of the same fetch, and without this the panel opens
+  // a SECOND request and waits a full extra round trip for a list already on its way.
+  let TASK_PROPS_INFLIGHT = null
   async function ensureTaskProps() {
-    if (TASK_PROPS.length) return
-    try { const r = await api("list_propositions", {}); TASK_PROPS = r.propositions || [] } catch (_) {}
+    if (TASK_PROPS.length) return true
+    if (!TASK_PROPS_INFLIGHT) {
+      TASK_PROPS_INFLIGHT = api("list_propositions", {})
+        .then((r) => { TASK_PROPS = r.propositions || []; return true })
+        .catch(() => false)
+        .finally(() => { TASK_PROPS_INFLIGHT = null })
+    }
+    return TASK_PROPS_INFLIGHT
   }
   function showDisposeForInitiative(triggerId, title) {
     SUG_TRIGGER = triggerId || null; SUG_TRIGGER_TITLE = title || null
@@ -1878,7 +1890,6 @@
     // Day 115 Build 2 Slice B: "Done" = already acted and it was TRUE → a hit, not a
     // reject. Counts as confirmed for calibration; spawns no task (already done).
     acts.appendChild(mkBtn("Done ✓", "btn-accept", () => dispose(id, "done")))
-    acts.appendChild(mkBtn("Amend", "btn-edit", () => openEdit(id, s.claim)))
     // Attach-to-person (currents #4b): re-point this thesis at a person via the
     // existing reattribute path (moves the inference to the person, closes the
     // original as a matching correction). Surfaced directly, not only under reject.
@@ -2031,27 +2042,12 @@
     }
   }
 
-  function openEdit(id, claim) {
-    const slot = $("inlineSlot"); slot.innerHTML = ""
-    const lab = document.createElement("label"); lab.textContent = "Corrected claim"; slot.appendChild(lab)
-    const ta = document.createElement("textarea"); ta.value = claim || ""; slot.appendChild(ta)
-    // Amend is NON-resolving: it records the correction and keeps the card
-    // pending so you still choose Accept / Reject / Snooze.
-    slot.appendChild(mkBtn("Save amendment", "btn-edit", () => amend(id, ta)))
-  }
-
-  async function amend(id, ta) {
-    const v = ta.value.trim(); if (!v) return
-    try {
-      await api("dispose", { suggestion_id: id, action: "amended", delta: { claim: v }, comment: "claim amended via console" })
-      const s = SUGS.find((x) => x.id === id)
-      if (s) { s.claim = v; s.amended = true }   // overlay locally; card stays pending
-      selectSug(id)                              // re-render with corrected claim + actions
-      const o = $("disp_out"); if (o) show(o, "Amendment saved — now Accept, Reject, or Snooze.", true)
-    } catch (e) {
-      const o = $("disp_out"); if (o) show(o, e.message, false); else alert(e.message)
-    }
-  }
+  // openEdit / amend removed Day 141. They were the only writers of action:"amended", a
+  // NON-resolving correction that in five months was used exactly zero times, while `edited`
+  // (correct + accept in one step) produced every confirmed_modified outcome in the estate.
+  // The READERS stay: list_suggestions still overlays a historical amendment onto the claim
+  // and sets s.amended, and selectSug still renders the .amended-tag from it — an old row
+  // must still display correctly even though no new one can be made.
 
   // Day 115 Build 2 Slice A: reject reason picker. The code rides in delta; the DB
   // gates calibration (only 'wrong'/absent debits the curve). 'wrong_person' also
@@ -2156,15 +2152,26 @@
   // accepting it means "keep the reading", and the server spawns no task unless you name the
   // work. A hypothesis-backed thesis prefills its suggested_action, which is about a real
   // subject and is a usable commitment.
-  function openAccept(id, s) {
+  async function openAccept(id, s) {
     const slot = $("inlineSlot"); if (!slot) return
+    // Await the proposition list HERE rather than relying on showDispose having fired it.
+    // showDispose() called ensureTaskProps() without awaiting, so a click that beat the
+    // response rendered a select holding only "standalone" — and standalone is a legitimate
+    // answer, so the failure was indistinguishable from a deliberate choice. The panel is
+    // the thing that needs the list, so the panel is where the wait belongs.
+    slot.innerHTML = '<p class="hint">…</p>'
+    const propsOk = await ensureTaskProps()
     slot.innerHTML = ""
     const wrap = document.createElement("div")
 
     const lab = document.createElement("label")
     lab.textContent = "What will you actually do?"
     wrap.appendChild(lab)
-    const ta = document.createElement("textarea"); ta.rows = 2
+    // Roomy on purpose: this is where the operator writes the commitment they will be shown
+    // again in 14 days. A two-line box invited accepting the generator's wording unread, which
+    // is the habit this whole change exists to break.
+    const ta = document.createElement("textarea"); ta.rows = 6
+    ta.style.minHeight = "150px"
     // Never prefill the boilerplate: it is the exact string this change exists to stop.
     const prefill = (s.suggested_action || "")
     ta.value = /^Landscape signal from news/.test(prefill) ? "" : prefill
@@ -2177,6 +2184,11 @@
 
     const plab = document.createElement("label"); plab.textContent = "File it into"
     wrap.appendChild(plab)
+    if (!propsOk) {
+      const w = document.createElement("p"); w.className = "hint"; w.style.color = "var(--reject)"
+      w.textContent = "Could not load your propositions — this will file standalone. Reload before accepting if you meant to file it."
+      wrap.appendChild(w)
+    }
     const sel = document.createElement("select")
     const none = document.createElement("option"); none.value = ""; none.textContent = "— standalone (no proposition) —"
     sel.appendChild(none)
@@ -2392,7 +2404,13 @@
     TASK_SEL.clear()
     const all = $("tasksAll") && $("tasksAll").checked
     try {
-      const payload = all ? { status: ["open", "stalled", "completed", "abandoned"] } : {}
+      // "Show resolved" lists EVERY status the CHECK admits, including the two nothing writes
+      // any more (`stalled`, retired Day 141) and the one nothing writes yet (`released`,
+      // awaiting the P4.3 cascade). The default view is open-only; this toggle is the sole way
+      // back to a historical row, so it must not quietly omit the statuses we stopped minting.
+      const payload = all
+        ? { status: ["open", "stalled", "completed", "abandoned", "folded", "released"] }
+        : {}
       // Pull the proposition list alongside tasks so each card's assign picker is populated.
       const [r, pr] = await Promise.all([
         api("list_tasks", payload),
@@ -2408,20 +2426,21 @@
   // is carried by its successors, a released one left with its container. They must not read
   // in the same colour as `abandoned`, which is the one terminal status that does mean the
   // work was given up. That distinction is the whole point of having separate verbs.
+  // `stalled` stays in this map deliberately: nothing writes it any more, but a historical
+  // row must still render with its own label rather than fall through to a default.
   const TASK_STATUS_COLOR = { open: "var(--gold)", stalled: "var(--ink-dim)", completed: "var(--green)", abandoned: "var(--reject)", folded: "var(--ink-dim)", released: "var(--ink-dim)" }
 
   // Day 129 (item #5): "Do next" prioritization. Recent = the Day-120 grouped view (updated_at).
   // Do next = one cross-proposition list ranked by a transparent composite: horizon is the
-  // operator's own lever (now>next>later), open outranks stalled, and an open task gains urgency
+  // operator's own lever (now>next>later), and an open task gains urgency
   // as it ages. v1 uses only signals on the task itself; expiring-thesis / stakeholder-stage /
   // fit are the tunable next layer (they need a list_tasks join — held for a server pass).
   let TASK_SORT = "recent", TASKS_CACHE = []
   const HORIZON_RANK = { now: 3, next: 2, later: 1 }
   function doNextScore(t) {
     const h = HORIZON_RANK[t.horizon] ?? 1.5              // unset sits between next and later
-    const statusMult = t.status === "stalled" ? 0.5 : 1  // stalled is parked — sinks but stays visible
     const ageDays = t.created_at ? Math.max(0, (Date.now() - new Date(t.created_at).getTime()) / 86400000) : 0
-    return h * statusMult + Math.min(ageDays / 14, 1)     // up to +1 as an open task ages toward 2 weeks
+    return h + Math.min(ageDays / 14, 1)                  // up to +1 as an open task ages toward 2 weeks
   }
 
   // Day 120: group by proposition membership. Standalone tasks (proposition_id null) are
@@ -2479,7 +2498,7 @@
     if (TASK_SORT === "donext") {
       const ranked = tasks.slice().sort((a, b) => doNextScore(b) - doNextScore(a))
       host.appendChild(taskGroupHeader("Do next · " + ranked.length,
-        "One ranked list across every proposition: horizon (now → later), open before stalled, older work rising. Set a task's horizon on the Propositions board to move it up."))
+        "One ranked list across every proposition, oldest-pressing first. Use \u201cStill live\u201d to push a task's review date out."))
       for (const t of ranked) host.appendChild(taskCard(t))
       return
     }
@@ -2513,7 +2532,7 @@
     // non-terminal tasks only, matching the action row below: a completed task has nowhere to
     // be filed to that matters. Same mg-cb idiom as the merge composer so the console has one
     // multi-select pattern rather than two.
-    if (t.status === "open" || t.status === "stalled") {
+    if (t.status === "open") {
       const cb = document.createElement("input")
       cb.type = "checkbox"; cb.className = "mg-cb"; cb.value = t.id
       cb.style.cssText = "margin-right:8px;vertical-align:middle"
@@ -2547,14 +2566,13 @@
     if (mchip) { meta.appendChild(document.createTextNode(" · ")); meta.appendChild(mchip) }
     card.appendChild(meta)
 
-    // Action row — only for non-terminal tasks (open / stalled).
-    if (t.status === "open" || t.status === "stalled") {
+    // Action row — only for open tasks. `stalled` retired Day 141 (zero uses ever); deferral
+    // is now "Still live", which moves the review date instead of setting a state.
+    if (t.status === "open") {
       const acts = document.createElement("div"); acts.className = "acts"
       acts.appendChild(mkBtn("Complete", "btn-accept", () => updateTaskStatus(t.id, "completed")))
       acts.appendChild(mkBtn("Abandon", "btn-reject", () => updateTaskStatus(t.id, "abandoned")))
       acts.appendChild(mkBtn("Still live", "btn-snooze", () => renewTask(t.id)))
-      acts.appendChild(mkBtn(t.status === "stalled" ? "Reopen" : "Stall", "btn-snooze",
-        () => updateTaskStatus(t.id, t.status === "stalled" ? "open" : "stalled")))
       acts.appendChild(mkBtn("Edit action", "btn-edit", () => openTaskEdit(card, t)))
       acts.appendChild(mkBtn("✧ Reframe", "btn-edit", () => {
         let slot = card.querySelector(".reframe-slot")
@@ -2660,7 +2678,7 @@
       // taskCard's proposition picker reads TASK_PROPS; populate it here too so a floater
       // opened from this tab can be filed without first visiting Tasks.
       TASK_PROPS = pr.propositions || []
-      PROP_FLOATERS = (tr.tasks || []).filter((t) => !t.proposition_id && (t.status === "open" || t.status === "stalled"))
+      PROP_FLOATERS = (tr.tasks || []).filter((t) => !t.proposition_id && (t.status === "open"))
       renderPropRail(pr.propositions || [])
     } catch (e) { host.innerHTML = ""; host.textContent = e.message }
   }
@@ -2904,8 +2922,8 @@
     // Filtered HERE rather than in the RPC: get_proposition is a proven read path with other
     // callers, and the two propose ops query `tasks` directly with status='open', so neither
     // needs it. The count stays visible and one click brings them back — hidden, not dropped.
-    const liveTasks = p.tasks.filter((x) => x.status === "open" || x.status === "stalled")
-    const doneTasks = p.tasks.filter((x) => x.status !== "open" && x.status !== "stalled")
+    const liveTasks = p.tasks.filter((x) => x.status === "open")
+    const doneTasks = p.tasks.filter((x) => x.status !== "open")
     // get_proposition already orders by review_at (nulls last), so the array arrives in
     // reading order: overdue first, undated terminal rows at the bottom.
     const lane = PROP_SHOW_DONE ? p.tasks : liveTasks
@@ -2962,7 +2980,7 @@
   //   being the reading: a task renewed four times is the operator declining to close, four
   //   times, and that is a fact about the work.
   function reviewChip(t) {
-    if (!t.review_at || (t.status !== "open" && t.status !== "stalled")) return null
+    if (!t.review_at || t.status !== "open") return null
     const due = new Date(t.review_at)
     const days = Math.round((due.getTime() - Date.now()) / 86400000)
     const overdue = days < 0
@@ -2985,7 +3003,7 @@
     pill.innerHTML = '<span style="color:' + (TASK_STATUS_COLOR[t.status] || "var(--ink-dim)") + '">● ' + esc(t.status) + "</span>"
     const chip = reviewChip(t); if (chip) pill.appendChild(chip)
     c.appendChild(pill)
-    if (t.status === "open" || t.status === "stalled") {
+    if (t.status === "open") {
       // No longer draggable: the now/next/later columns it was dragged between are gone.
       const acts = document.createElement("div"); acts.className = "acts"; acts.style.marginTop = "6px"
       const b = (label, cls, fn) => { const x = mkBtn(label, cls + " mini", fn); x.style.marginTop = "0"; return x }
