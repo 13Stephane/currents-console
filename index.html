@@ -20,7 +20,16 @@
     font-family: Georgia, "Times New Roman", serif;
     font-size: 16px; line-height: 1.5; -webkit-font-smoothing: antialiased;
   }
-  .wrap { max-width: 720px; margin: 0 auto; padding: 48px 24px 72px; }
+  /* The nav sits at the wrap's left edge, so the wrap's width must NOT vary by view.
+     It used to: `body.wide` swapped 720px ↔ 1180px on the Theses tab only, and since
+     the wrap is centred, the whole menu jumped ~230px sideways on every tab change.
+     The wrap is now fixed at the wide measure and reading measure is a per-view
+     concern (the rule below) — every view hangs from one left margin. */
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 48px 24px 72px; }
+  /* 672px = the old 720px wrap minus its 2×24px padding: the form/prose views keep
+     the exact column width they had before the wrap was widened. Only the Theses
+     split-reader (and, later, the Propositions split) uses the full width. */
+  #gatePanel, #addView, #tasksView, #newsView, #propositionsView { max-width: 672px; }
   .mono { font-family: "IBM Plex Mono", "SF Mono", ui-monospace, Menlo, monospace; }
   .head { display: flex; align-items: baseline; justify-content: space-between; gap: 18px;
     border-bottom: 1px solid var(--line); padding-bottom: 16px; margin-bottom: 28px; flex-wrap: wrap; }
@@ -70,7 +79,6 @@
   .nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 26px; }
   .nav button { margin-top: 0; background: transparent; color: var(--ink-dim); border-color: var(--line); }
   .nav button.active { border-color: var(--gold); background: var(--gold); color: var(--bg); font-weight: 500; }
-  body.wide .wrap { max-width: 1180px; }
   .split { display: grid; grid-template-columns: 312px minmax(0,1fr) 290px; gap: 18px; align-items: start; }
   @media (max-width: 940px) { .split { grid-template-columns: 1fr; } }
   .col { border: 1px solid var(--line); border-radius: 3px; background: rgba(244,240,233,.02); }
@@ -881,7 +889,9 @@
     $("propositionsView").classList.toggle("hidden", active !== "navPropositions")
     $("tasksView").classList.toggle("hidden", active !== "navTasks")
     $("newsView").classList.toggle("hidden", active !== "navNews")
-    document.body.classList.toggle("wide", active === "navDispose")
+    // No width toggle here. Switching the wrap's max-width per view moved the nav
+    // itself (the wrap is centred) — width is now a per-view CSS concern, not a
+    // body-class one. See the .wrap comment.
   }
   function showAdd() { setNav("navAdd"); $("rm_q").focus() }
   // Day 129: the Theses feed can be filtered to one initiative's theses (from Active initiatives).
