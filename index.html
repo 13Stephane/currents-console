@@ -1506,6 +1506,56 @@
     }
   }
 
+  // Description history (Day 140 follow-up). Every field change update_proposition makes is
+  // logged, so a rewritten description is recoverable instead of destroyed.
+  //
+  // REVERT IS A REWRITE, NOT AN UNDO: it calls update_proposition with the old text, which
+  // appends a further history row. Nothing is locked and nothing is deleted, so the description
+  // stays freely rewritable — which was the operator's condition on wanting history at all.
+  const FIELD_LABEL = { thesis_statement: "description", title: "title", product: "product", status: "status" }
+  async function openPropHistory(pid, mount) {
+    mount.innerHTML = '<p class="hint">Reading change history…</p>'
+    let r
+    try { r = await api("get_proposition_history", { proposition_id: pid }) }
+    catch (e) { mount.innerHTML = '<p class="out err" style="display:block">' + esc(e.message) + "</p>"; return }
+    mount.innerHTML = ""
+    if (!r.history.length) {
+      mount.innerHTML = '<p class="hint">No changes recorded yet. History starts from the first edit after 10 Aug.</p>'
+      return
+    }
+    const lab = document.createElement("div"); lab.className = "hint"
+    lab.style.cssText = "text-transform:uppercase;letter-spacing:.1em;color:var(--gold);margin-bottom:8px"
+    lab.textContent = r.history.length + (r.history.length === 1 ? " change" : " changes")
+    mount.appendChild(lab)
+
+    for (const h of r.history) {
+      const row = document.createElement("div")
+      row.style.cssText = "display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)"
+      const txt = document.createElement("div"); txt.style.flex = "1"
+      const when = document.createElement("div"); when.className = "hint"
+      when.textContent = (FIELD_LABEL[h.field] || h.field) + " · " + new Date(h.changed_at).toLocaleString()
+      txt.appendChild(when)
+      // The OLD value is the useful line here — the new one is already on screen above.
+      const was = document.createElement("div")
+      was.style.cssText = "font-style:italic;color:var(--ink-dim);margin-top:3px;font-size:13.5px"
+      was.textContent = h.old_value == null ? "(was not set)" : "was: " + h.old_value
+      txt.appendChild(was)
+      row.appendChild(txt)
+      if (h.old_value != null) {
+        const rev = mkBtn("Restore", "btn-edit", async () => {
+          rev.disabled = true; rev.textContent = "…"
+          try {
+            await api("update_proposition", { proposition_id: pid, [h.field]: h.old_value })
+            await openProposition(pid)
+          } catch (e) { rev.disabled = false; rev.textContent = "Restore"; alert(e.message) }
+        })
+        rev.style.cssText = "margin-top:0;padding:5px 12px;font-size:11px"
+        row.appendChild(rev)
+      }
+      mount.appendChild(row)
+    }
+  }
+
   // STEP 1 (Day 140, from first-use feedback): critique the proposition's description against
   // the tasks actually under it, and offer replacements derived FROM those tasks. Writes
   // nothing until you dispose one into thesis_statement, which is the same gesture as Reframe.
@@ -2423,7 +2473,12 @@
     const lnSlot = document.createElement("div"); lnSlot.dataset.open = "0"; lnSlot.style.margin = "0 0 10px"
     const lnBtn = mkBtn("⑃ Lineage", "btn-edit", () => openLineage(p.id, lnSlot))
     lnBtn.style.cssText = "margin-top:0;margin-left:8px"
-    host.appendChild(lnBtn); host.appendChild(rfSlot); host.appendChild(lnSlot)
+    // ⧉ History (Day 140 follow-up): what the description used to say. Sits beside Reframe
+    // because it is the counterweight to it — every rewrite from here or from the description
+    // review is recorded, so neither is a one-way door any more.
+    const hsBtn = mkBtn("⧉ History", "btn-edit", () => openPropHistory(p.id, lnSlot))
+    hsBtn.style.cssText = "margin-top:0;margin-left:8px"
+    host.appendChild(lnBtn); host.appendChild(hsBtn); host.appendChild(rfSlot); host.appendChild(lnSlot)
 
     // lifecycle
     const life = document.createElement("div"); life.className = "acts"; life.style.marginBottom = "10px"
