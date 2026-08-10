@@ -29,7 +29,18 @@
   /* 672px = the old 720px wrap minus its 2×24px padding: the form/prose views keep
      the exact column width they had before the wrap was widened. Only the Theses
      split-reader (and, later, the Propositions split) uses the full width. */
-  #gatePanel, #addView, #tasksView { max-width: 672px; }
+  #gatePanel, #tasksView { max-width: 672px; }
+  /* Find/add is two columns (Day 141), so it takes the full measure. Each column keeps a
+     form-sized width of its own — a text input 550px wide reads as a mistake. */
+  .add-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 26px; align-items: start; }
+  .add-col { min-width: 0; }
+  .add-col .panel { margin-bottom: 14px; }
+  .col-lead { font-family: "IBM Plex Mono", monospace; font-size: 10px; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--gold); padding-bottom: 9px; margin-bottom: 14px;
+    border-bottom: 1px solid var(--line); }
+  .col-lead span { display: block; margin-top: 5px; letter-spacing: .04em; text-transform: none;
+    color: var(--ink-faint); font-size: 11px; }
+  @media (max-width: 940px) { .add-cols { grid-template-columns: 1fr; } }
   /* News and Propositions are two-pane readers, so their split runs the full width —
      but their explainer/filter panel is prose and keeps a reading measure. */
   #newsView > .panel, #propositionsView > .panel { max-width: 760px; }
@@ -63,6 +74,8 @@
   }
   button.ghost { background: transparent; color: var(--ink-dim); border-color: var(--line); }
   button.ghost:hover { border-color: var(--gold); color: var(--ink); }
+  /* A ghost button that toggles a panel open reads as pressed while that panel is showing. */
+  button.ghost.active { background: var(--gold); border-color: var(--gold); color: var(--bg); }
   button:active { transform: translateY(1px); }
   .row { display: flex; gap: 12px; flex-wrap: wrap; }
   .row > * { flex: 1; min-width: 150px; }
@@ -337,6 +350,13 @@
     </div>
 
     <div id="addView">
+    <!-- Day 141 · two columns, split by what the surface DOES rather than by build order.
+         Left asks questions of what already exists and acts on it; right records new facts
+         into the spine. Nine panels in one column meant "Active initiatives" sat eighth,
+         below five unrelated forms — the reason it read as missing. -->
+    <div class="add-cols">
+      <div class="add-col">
+        <div class="col-lead">Find, resolve, act<span>ask what you already hold — and set work in motion</span></div>
     <div class="panel" id="finderPanel">
       <h2>Find or add</h2>
       <p class="hint">Search what you already know — people and organizations — before adding, so you never make a duplicate. Type a name; add precision keys (email / LinkedIn) to resolve exactly. Nothing matches? Add it inline. Read-only search; keys resolve precisely, a name alone surfaces every twin (never auto-matched).</p>
@@ -371,6 +391,55 @@
       <div id="rel_out" style="margin-top:4px"></div>
     </div>
 
+    <div class="panel">
+      <h2>Ambiguous matches <button class="ghost mini" id="refreshBtn" style="margin-left:10px">refresh</button></h2>
+      <p class="hint">Same-name twins routed for human disposal (§3.6). Never auto-merged.</p>
+      <div id="pending" style="margin-top:10px"></div>
+    </div>
+    <!-- Initiatives (folded in Day 129): a top-down create/act surface. Was a standalone
+         nav tab; now one of the create surfaces in Find/add. Handlers (initiativeDryRun /
+         initiativeDispatch) are unchanged — they key on the same i_* ids. -->
+    <div class="panel">
+      <h2>Active initiatives <button class="ghost mini" id="initListRefresh" style="margin-left:10px">load / refresh</button></h2>
+      <p class="hint">Themes you've dispatched. Each ranked people and minted one fit-thesis per person into your <strong>Theses</strong> feed — click a row to see those theses.</p>
+      <div id="initList" style="margin-top:10px"></div>
+    </div>
+    <div class="panel">
+      <h2>Declare an initiative</h2>
+      <p class="hint">A top-down theme dispatched as <em>individuated</em> fit-hypotheses — never a mail-merge. Currents embeds the intent, ranks people by how their current drivers/needs fit it, and composes one grounded fit-claim per person that rides the normal disposal feed. <strong>Step 1: dry-run</strong> to read the fit distribution and pick a floor from data. <strong>Step 2: dispatch</strong> at that floor.</p>
+      <label>Intent *</label>
+      <textarea id="i_intent" placeholder="e.g. AI in professional-service firms: job-design &amp; transformation"></textarea>
+      <div class="row">
+        <div><label>Sample limit</label><input id="i_limit" value="100"></div>
+      </div>
+      <button id="i_dryBtn">Dry-run · preview fit</button>
+      <div class="out" id="i_dry_out"></div>
+      <div id="i_dist" class="hidden" style="margin-top:16px"></div>
+      <div id="i_cands" class="search-results" style="margin-top:10px"></div>
+    </div>
+
+    <div class="panel hidden" id="i_dispatchPanel">
+      <h2>Dispatch live</h2>
+      <p class="hint">⚠ This writes: it creates the initiative, composes a fit-claim per candidate (up to the cap), and routes each into your pending feed. Routing writes the audit chain — a live dispatch owes a verify + anchor at close.</p>
+      <label>Title *</label>
+      <input id="i_title" placeholder="short name for this initiative">
+      <div class="row">
+        <div><label>Floor (from distribution)</label><input id="i_floor" placeholder="e.g. 0.45"></div>
+        <div><label>Weak-fit below</label><input id="i_weak" placeholder="e.g. 0.50 (optional)"></div>
+        <div><label>Cap (max people)</label><input id="i_cap" value="8"></div>
+      </div>
+      <button id="i_liveBtn">Dispatch initiative</button>
+      <div class="out" id="i_live_out"></div>
+      <div id="i_results" style="margin-top:10px"></div>
+    </div>
+
+    <!-- Active initiatives (Day 129): the "where do I see them once set" surface. A
+         dispatched initiative previously vanished from view — its only trace was the
+         theses it minted. list_initiatives reads triggers(kind='initiative') and each row
+         jumps to that initiative's theses in the Theses feed. -->
+      </div>
+      <div class="add-col">
+        <div class="col-lead">Record into the spine<span>put new facts and content in</span></div>
     <div class="panel" id="addPersonPanel">
       <h2>Add person</h2>
       <label>Full name *</label>
@@ -459,51 +528,7 @@
       <div id="library" style="margin-top:10px"></div>
     </div>
 
-    <div class="panel">
-      <h2>Ambiguous matches <button class="ghost mini" id="refreshBtn" style="margin-left:10px">refresh</button></h2>
-      <p class="hint">Same-name twins routed for human disposal (§3.6). Never auto-merged.</p>
-      <div id="pending" style="margin-top:10px"></div>
-    </div>
-    <!-- Initiatives (folded in Day 129): a top-down create/act surface. Was a standalone
-         nav tab; now one of the create surfaces in Find/add. Handlers (initiativeDryRun /
-         initiativeDispatch) are unchanged — they key on the same i_* ids. -->
-    <div class="panel">
-      <h2>Declare an initiative</h2>
-      <p class="hint">A top-down theme dispatched as <em>individuated</em> fit-hypotheses — never a mail-merge. Currents embeds the intent, ranks people by how their current drivers/needs fit it, and composes one grounded fit-claim per person that rides the normal disposal feed. <strong>Step 1: dry-run</strong> to read the fit distribution and pick a floor from data. <strong>Step 2: dispatch</strong> at that floor.</p>
-      <label>Intent *</label>
-      <textarea id="i_intent" placeholder="e.g. AI in professional-service firms: job-design &amp; transformation"></textarea>
-      <div class="row">
-        <div><label>Sample limit</label><input id="i_limit" value="100"></div>
       </div>
-      <button id="i_dryBtn">Dry-run · preview fit</button>
-      <div class="out" id="i_dry_out"></div>
-      <div id="i_dist" class="hidden" style="margin-top:16px"></div>
-      <div id="i_cands" class="search-results" style="margin-top:10px"></div>
-    </div>
-
-    <div class="panel hidden" id="i_dispatchPanel">
-      <h2>Dispatch live</h2>
-      <p class="hint">⚠ This writes: it creates the initiative, composes a fit-claim per candidate (up to the cap), and routes each into your pending feed. Routing writes the audit chain — a live dispatch owes a verify + anchor at close.</p>
-      <label>Title *</label>
-      <input id="i_title" placeholder="short name for this initiative">
-      <div class="row">
-        <div><label>Floor (from distribution)</label><input id="i_floor" placeholder="e.g. 0.45"></div>
-        <div><label>Weak-fit below</label><input id="i_weak" placeholder="e.g. 0.50 (optional)"></div>
-        <div><label>Cap (max people)</label><input id="i_cap" value="8"></div>
-      </div>
-      <button id="i_liveBtn">Dispatch initiative</button>
-      <div class="out" id="i_live_out"></div>
-      <div id="i_results" style="margin-top:10px"></div>
-    </div>
-
-    <!-- Active initiatives (Day 129): the "where do I see them once set" surface. A
-         dispatched initiative previously vanished from view — its only trace was the
-         theses it minted. list_initiatives reads triggers(kind='initiative') and each row
-         jumps to that initiative's theses in the Theses feed. -->
-    <div class="panel">
-      <h2>Active initiatives <button class="ghost mini" id="initListRefresh" style="margin-left:10px">load / refresh</button></h2>
-      <p class="hint">Themes you've dispatched. Each ranked people and minted one fit-thesis per person into your <strong>Theses</strong> feed — click a row to see those theses.</p>
-      <div id="initList" style="margin-top:10px"></div>
     </div>
     </div><!-- /addView -->
 
@@ -588,9 +613,15 @@
 
     <div id="propositionsView" class="hidden">
     <div class="panel">
-      <h2>Propositions <button class="ghost mini" id="propRefresh" style="margin-left:10px">refresh</button></h2>
-      <details style="margin-top:10px">
-        <summary class="hint" style="cursor:pointer">+ new proposition</summary>
+      <!-- Day 141: the three controls sit on the heading line. They were a button plus two
+           <summary> rows stacked underneath, which read as three different kinds of thing
+           when they are three ways to change the same list. -->
+      <h2 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:0">Propositions
+        <button class="ghost mini" id="propRefresh" style="margin-left:6px">refresh</button>
+        <button class="ghost mini" id="propNewToggle">+ new</button>
+        <button class="ghost mini" id="propMergeToggle">merge</button>
+      </h2>
+      <div id="propNewBox" class="hidden">
         <div style="margin-top:8px">
           <label>Title *</label><input id="p_title" placeholder="Reinventing Finance with AI">
           <label>Kind</label>
@@ -600,19 +631,18 @@
           <button id="p_createBtn" style="margin-top:8px">Create proposition</button>
           <div class="out" id="p_createOut" style="margin-top:8px"></div>
         </div>
-      </details>
-      <details style="margin-top:8px" id="mergePicker">
-        <summary class="hint" style="cursor:pointer">⧉ merge propositions</summary>
+      </div>
+      <div id="mergePicker" class="hidden">
         <div style="margin-top:8px">
-          <p class="hint">Pick two or more, then open the composer. Only <em>active</em> and <em>paused</em> propositions are listed: <em>won</em> is current but not mergeable, and the RPC refuses it. Clustering is out of scope while <span class="mono">intent_embedding</span> is unpopulated — at nine propositions the pick is faster by hand.</p>
+          <p class="hint">Pick two or more, then open the composer. Only <em>active</em> and <em>paused</em> propositions are listed: <em>won</em> is current but not mergeable, and the RPC refuses it.</p>
           <div id="mg_candidates" style="margin-top:10px"></div>
           <div class="acts">
-            <button id="mg_openBtn" class="btn-accept">Open composer</button>
-            <button id="mg_refreshBtn" class="ghost">refresh</button>
+            <button id="mg_openBtn" class="btn-accept mini">Open composer</button>
+            <button id="mg_refreshBtn" class="ghost mini">refresh</button>
           </div>
           <div class="out" id="mg_pickOut"></div>
         </div>
-      </details>
+      </div>
     </div>
     <!-- Two-pane reader (Day 141). Left column is one scroll container holding BOTH lists:
          the propositions, then the floating tasks (proposition_id is null) directly under
@@ -995,7 +1025,15 @@
   // Day 129: the Theses feed can be filtered to one initiative's theses (from Active initiatives).
   // Clicking the Theses NAV tab clears any filter (full feed); the initiative row sets it.
   let SUG_TRIGGER = null, SUG_TRIGGER_TITLE = null
-  function showDispose() { SUG_TRIGGER = null; SUG_TRIGGER_TITLE = null; setNav("navDispose"); loadSuggestions() }
+  function showDispose() { SUG_TRIGGER = null; SUG_TRIGGER_TITLE = null; setNav("navDispose"); loadSuggestions(); ensureTaskProps() }
+
+  // The accept panel offers a proposition to file into, so the Theses tab needs the list too.
+  // Fetched once per session rather than per accept: it is a small read and the panel opens
+  // mid-decision, where a spinner in a select is worse than a slightly stale title.
+  async function ensureTaskProps() {
+    if (TASK_PROPS.length) return
+    try { const r = await api("list_propositions", {}); TASK_PROPS = r.propositions || [] } catch (_) {}
+  }
   function showDisposeForInitiative(triggerId, title) {
     SUG_TRIGGER = triggerId || null; SUG_TRIGGER_TITLE = title || null
     setNav("navDispose"); loadSuggestions()
@@ -1836,7 +1874,7 @@
     // Order: positive commits first (Accept, Done), then non-destructive edits
     // (Amend the wording, Attach to the right person), then defer (Snooze), then the
     // destructive action last (Reject) — reduces misclicks on the negative path.
-    acts.appendChild(mkBtn("Accept", "btn-accept", () => dispose(id, "accepted")))
+    acts.appendChild(mkBtn("Accept", "btn-accept", () => openAccept(id, s)))
     // Day 115 Build 2 Slice B: "Done" = already acted and it was TRUE → a hit, not a
     // reject. Counts as confirmed for calibration; spawns no task (already done).
     acts.appendChild(mkBtn("Done ✓", "btn-accept", () => dispose(id, "done")))
@@ -2103,6 +2141,64 @@
       if (!inp.value) return
       dispose(id, "snoozed", { snooze_until: new Date(inp.value).toISOString() })
     }))
+  }
+
+  // Day 141 — accept asks what you are committing to and where it lives.
+  //
+  // Before this, accept spawned a task straight from the generator's `suggested_action` and
+  // inherited the thesis's proposition_id, which is set on 1 of 242 suggestions. So every
+  // accepted thesis was born floating, and floating tasks are abandoned at 70% against 14%
+  // for filed ones. For a landscape thesis from News it was worse: `suggested_action` is the
+  // literal string "Landscape signal from news — dispose (accept to keep, reject to drop)",
+  // and twelve tasks reading exactly that were minted and then abandoned.
+  //
+  // A MODEL-FREE thesis (no hypothesis — the News path) leaves the action blank by design:
+  // accepting it means "keep the reading", and the server spawns no task unless you name the
+  // work. A hypothesis-backed thesis prefills its suggested_action, which is about a real
+  // subject and is a usable commitment.
+  function openAccept(id, s) {
+    const slot = $("inlineSlot"); if (!slot) return
+    slot.innerHTML = ""
+    const wrap = document.createElement("div")
+
+    const lab = document.createElement("label")
+    lab.textContent = "What will you actually do?"
+    wrap.appendChild(lab)
+    const ta = document.createElement("textarea"); ta.rows = 2
+    // Never prefill the boilerplate: it is the exact string this change exists to stop.
+    const prefill = (s.suggested_action || "")
+    ta.value = /^Landscape signal from news/.test(prefill) ? "" : prefill
+    ta.placeholder = "Leave blank to just keep the reading — no task will be created."
+    wrap.appendChild(ta)
+
+    const hint = document.createElement("p"); hint.className = "hint"; hint.style.margin = "6px 0 0"
+    hint.textContent = "Blank = accepted as a reading. The calibration signal is recorded either way."
+    wrap.appendChild(hint)
+
+    const plab = document.createElement("label"); plab.textContent = "File it into"
+    wrap.appendChild(plab)
+    const sel = document.createElement("select")
+    const none = document.createElement("option"); none.value = ""; none.textContent = "— standalone (no proposition) —"
+    sel.appendChild(none)
+    for (const p of TASK_PROPS) {
+      if (p.status === "dropped" || p.status === "archived") continue
+      const o = document.createElement("option"); o.value = p.id; o.textContent = p.title
+      sel.appendChild(o)
+    }
+    wrap.appendChild(sel)
+
+    const acts = document.createElement("div"); acts.className = "acts"
+    acts.appendChild(mkBtn("Confirm accept", "btn-accept", () => {
+      const action = ta.value.trim()
+      const delta = {}
+      if (action) delta.task_action = action
+      if (sel.value) delta.proposition_id = sel.value
+      dispose(id, "accepted", Object.keys(delta).length ? { delta } : undefined)
+    }))
+    acts.appendChild(mkBtn("Cancel", "btn-snooze", () => { slot.innerHTML = "" }))
+    wrap.appendChild(acts)
+    slot.appendChild(wrap)
+    ta.focus()
   }
 
   async function dispose(id, action, extra) {
@@ -2440,12 +2536,15 @@
     const meta = document.createElement("div"); meta.className = "hint"; meta.style.marginTop = "5px"
     const age = t.created_at ? Math.max(0, Math.round((Date.now() - new Date(t.created_at).getTime()) / 86400000)) : null
     const pill = '<span style="color:' + (TASK_STATUS_COLOR[t.status] || "var(--ink-dim)") + ';font-weight:600">● ' + t.status + '</span>'
+    // horizon is no longer shown: it was hardcoded 'now' at spawn and never moved, so the
+    // pill was a constant. The review date replaces it as the only live time signal.
     meta.innerHTML = pill
-      + (t.horizon ? ' · <span style="color:var(--ink-dim)">▷ ' + t.horizon + "</span>" : "")
       + (subjectHTML ? " · " + subjectHTML : "")
       + (t.proposition_name ? ' · <span style="color:var(--gold)">◆ ' + esc(t.proposition_name) + "</span>" : "")
       + (t.created_from ? " · from " + esc(t.created_from) : "")
       + (age !== null ? " · " + (age === 0 ? "today" : age + "d ago") : "")
+    const mchip = reviewChip(t)
+    if (mchip) { meta.appendChild(document.createTextNode(" · ")); meta.appendChild(mchip) }
     card.appendChild(meta)
 
     // Action row — only for non-terminal tasks (open / stalled).
@@ -2453,6 +2552,7 @@
       const acts = document.createElement("div"); acts.className = "acts"
       acts.appendChild(mkBtn("Complete", "btn-accept", () => updateTaskStatus(t.id, "completed")))
       acts.appendChild(mkBtn("Abandon", "btn-reject", () => updateTaskStatus(t.id, "abandoned")))
+      acts.appendChild(mkBtn("Still live", "btn-snooze", () => renewTask(t.id)))
       acts.appendChild(mkBtn(t.status === "stalled" ? "Reopen" : "Stall", "btn-snooze",
         () => updateTaskStatus(t.id, t.status === "stalled" ? "open" : "stalled")))
       acts.appendChild(mkBtn("Edit action", "btn-edit", () => openTaskEdit(card, t)))
@@ -2535,7 +2635,8 @@
   const STAGES = ["considering", "latent", "active", "committed", "declined", "dropped"]
   const STAGE_LABEL = { considering: "Considering", latent: "Latent", active: "Active", committed: "Committed", declined: "Declined", dropped: "Dropped" }
   const STAGE_COLOR = { considering: "var(--ink-faint)", latent: "var(--ink-dim)", active: "var(--gold)", committed: "var(--green)", declined: "var(--reject)", dropped: "var(--reject)" }
-  const HORIZONS = ["now", "next", "later"]
+  // HORIZONS / moveTaskHorizon retired with the now/next/later board (Day 141). The column
+  // survives on the row and in get_proposition; nothing in the console writes it any more.
   // Exactly one of these is non-null: the detail pane shows a proposition or a floating
   // task, never both, so selecting one must clear the other.
   let PROP_OPEN = null, PROP_TASK_OPEN = null
@@ -2570,8 +2671,13 @@
     h.textContent = text; return h
   }
 
-  function renderPropRail(props) {
+  function renderPropRail(allProps) {
     const host = $("propRail"); host.innerHTML = ""
+    // Day 141: a dropped proposition is a closed decision, not a workspace. It stays in the
+    // database (and in lineage, and in get_proposition's recursive family) — it just leaves
+    // the working list, which is the only place its presence cost anything.
+    const props = allProps.filter((p) => p.status !== "dropped")
+    const droppedCount = allProps.length - props.length
     const ph = document.createElement("div"); ph.className = "col-h"; ph.style.paddingTop = "14px"
     ph.textContent = "Propositions · " + props.length
     host.appendChild(ph)
@@ -2594,6 +2700,12 @@
       row.appendChild(m)
       row.addEventListener("click", () => openProposition(p.id))
       host.appendChild(row)
+    }
+    if (droppedCount) {
+      const d = document.createElement("p"); d.className = "empty"
+      d.style.cssText = "padding:8px 16px;font-size:11px"
+      d.textContent = droppedCount + (droppedCount === 1 ? " dropped proposition is" : " dropped propositions are") + " hidden."
+      host.appendChild(d)
     }
 
     // Floating tasks: real work that belongs to no workspace. Kept in this column rather
@@ -2715,41 +2827,42 @@
     // restructure-tasks buried below the horizon lanes, fold-a-thesis at the very bottom of
     // the page. Four buttons that all reshape this proposition sat in three different places.
     //
-    //   1. ACT     — the four that change the proposition. One shared slot, so opening a
-    //                second proposal replaces the first instead of stacking panels.
-    //   2. READ    — lineage and history, unchanged: read-only viewers, their own slot.
-    //   3. OUTCOME — the lifecycle verbs. Last, and quiet, because they close the thing.
+    //   1. ACT           — the four that change the proposition. One shared slot, so opening
+    //                      a second proposal replaces the first instead of stacking panels.
+    //   2. READ + OUTCOME — lineage/history (read-only viewers) and the lifecycle verbs, on
+    //                      one line separated by a rule. Two lines total, not three: at mini
+    //                      size the whole control block is a glance rather than a column.
     const actSlot = document.createElement("div"); actSlot.style.margin = "0 0 4px"
     const act = document.createElement("div"); act.className = "acts"; act.style.marginTop = "10px"
-    act.appendChild(mkBtn("Reframe thesis", "btn-edit", () =>
+    const mini = (label, cls, fn) => { const b = mkBtn(label, cls + " mini", fn); b.style.marginTop = "0"; return b }
+    act.appendChild(mini("Reframe thesis", "btn-edit", () =>
       openReframe("proposition", p.id, p.thesis_statement || p.title, actSlot, async (text) => {
         await api("update_proposition", { proposition_id: p.id, thesis_statement: text }); openProposition(p.id)
       })))
-    act.appendChild(mkBtn("Review description", "btn-edit", () => openDescriptionReview(p.id, actSlot)))
-    act.appendChild(mkBtn("Restructure tasks", "btn-edit", () => openRestructure(p.id, actSlot)))
-    act.appendChild(mkBtn("Fold a pending thesis", "btn-edit", () => openFoldPicker(p, actSlot)))
+    act.appendChild(mini("Review description", "btn-edit", () => openDescriptionReview(p.id, actSlot)))
+    act.appendChild(mini("Restructure tasks", "btn-edit", () => openRestructure(p.id, actSlot)))
+    act.appendChild(mini("Fold a pending thesis", "btn-edit", () => openFoldPicker(p, actSlot)))
     host.appendChild(act); host.appendChild(actSlot)
 
     // Lineage (§5). Present on every proposition: the op answers "was this folded from
     // anything" for propositions that were not, which is itself the reading.
     const lnSlot = document.createElement("div"); lnSlot.dataset.open = "0"; lnSlot.style.margin = "0 0 10px"
-    const read = document.createElement("div"); read.className = "acts"; read.style.marginTop = "10px"
-    read.appendChild(mkBtn("Lineage", "btn-snooze", () => openLineage(p.id, lnSlot)))
+    const life = document.createElement("div"); life.className = "acts"; life.style.margin = "8px 0 4px"
+    life.appendChild(mini("Lineage", "btn-snooze", () => openLineage(p.id, lnSlot)))
     // History (Day 140 follow-up): what the description used to say — the counterweight to
     // Reframe and Review description, so neither is a one-way door.
-    read.appendChild(mkBtn("History", "btn-snooze", () => openPropHistory(p.id, lnSlot)))
-    host.appendChild(read); host.appendChild(lnSlot)
-
-    // Outcome / lifecycle.
-    const life = document.createElement("div"); life.className = "acts"; life.style.margin = "10px 0 4px"
+    life.appendChild(mini("History", "btn-snooze", () => openPropHistory(p.id, lnSlot)))
+    const sep = document.createElement("span")
+    sep.style.cssText = "border-left:1px solid var(--line);margin:0 4px;align-self:stretch"
+    life.appendChild(sep)
     const lifeLab = document.createElement("span"); lifeLab.className = "hint"
     lifeLab.style.cssText = "margin:0 4px 0 0;align-self:center"; lifeLab.textContent = "outcome"
     life.appendChild(lifeLab)
     for (const s of ["active", "paused", "won", "dropped", "archived"]) {
       if (s === p.status) continue
-      life.appendChild(mkBtn(s, "btn-snooze", () => setPropStatus(p.id, s)))
+      life.appendChild(mini(s, "btn-snooze", () => setPropStatus(p.id, s)))
     }
-    host.appendChild(life)
+    host.appendChild(life); host.appendChild(lnSlot)
 
     // stakeholder board
     host.appendChild(propSection("Stakeholders · by engagement stage"))
@@ -2777,8 +2890,11 @@
       : "none yet — folding an org-thesis attaches its organization automatically"
     host.appendChild(orgs)
 
-    // tasks by horizon
-    host.appendChild(propSection("Tasks · by horizon"))
+    // Tasks, by when they are next due (Day 141). The three now/next/later lanes are retired:
+    // record_disposal hardcoded 'now', nothing ever moved a task off it, and 29 of 30 open
+    // tasks sat there — a board with three columns sorting one bucket. `horizon` is still on
+    // the row and still returned by get_proposition; only the board is gone.
+    host.appendChild(propSection("Tasks · by review date"))
     // Terminal tasks are hidden from the lanes by default (Day 140, from first-use feedback:
     // "all abandoned tasks still show and pollute the screen"). `get_proposition` returns every
     // task regardless of status — read live, it has no status filter — and on a worked
@@ -2790,15 +2906,12 @@
     // needs it. The count stays visible and one click brings them back — hidden, not dropped.
     const liveTasks = p.tasks.filter((x) => x.status === "open" || x.status === "stalled")
     const doneTasks = p.tasks.filter((x) => x.status !== "open" && x.status !== "stalled")
-    const hz = document.createElement("div"); hz.style.cssText = "display:flex;gap:10px;flex-wrap:wrap"
-    for (const horizon of HORIZONS) {
-      const col = propColumn(horizon, null)
-      makeDropTarget(col, "task", horizon, (taskId, to) => moveTaskHorizon(taskId, to))
-      const lane = (PROP_SHOW_DONE ? p.tasks : liveTasks).filter((x) => x.horizon === horizon)
-      if (!lane.length) { const e = document.createElement("div"); e.className = "hint"; e.textContent = "—"; col.appendChild(e) }
-      for (const t of lane) col.appendChild(taskMini(t))
-      hz.appendChild(col)
-    }
+    // get_proposition already orders by review_at (nulls last), so the array arrives in
+    // reading order: overdue first, undated terminal rows at the bottom.
+    const lane = PROP_SHOW_DONE ? p.tasks : liveTasks
+    const hz = document.createElement("div")
+    if (!lane.length) { const e = document.createElement("div"); e.className = "hint"; e.textContent = "— no live tasks"; hz.appendChild(e) }
+    for (const t of lane) hz.appendChild(taskMini(t))
     host.appendChild(hz)
     if (doneTasks.length) {
       const byStatus = {}
@@ -2842,21 +2955,60 @@
     return c
   }
 
+  // The review clock (Day 141), rendered the same way everywhere it appears. A task past its
+  // review date is not a new status — it is an open task that has gone unanswered, and it says
+  // so in words rather than by being silently sorted somewhere.
+  //   review_count is shown only once it is non-zero, where it stops being noise and starts
+  //   being the reading: a task renewed four times is the operator declining to close, four
+  //   times, and that is a fact about the work.
+  function reviewChip(t) {
+    if (!t.review_at || (t.status !== "open" && t.status !== "stalled")) return null
+    const due = new Date(t.review_at)
+    const days = Math.round((due.getTime() - Date.now()) / 86400000)
+    const overdue = days < 0
+    const s = document.createElement("span")
+    s.style.cssText = "font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;"
+      + "white-space:nowrap;color:" + (overdue ? "var(--gold)" : "var(--ink-faint)")
+      + (overdue ? ";font-weight:600" : "")
+    s.textContent = (overdue ? "due " + Math.abs(days) + "d ago" : days === 0 ? "due today" : "due in " + days + "d")
+      + (t.review_count ? " · renewed ×" + t.review_count : "")
+    s.title = "Review date " + due.toISOString().slice(0, 10)
+      + (t.review_count ? " · renewed " + t.review_count + " time(s)" : "")
+    return s
+  }
+
   function taskMini(t) {
-    const c = document.createElement("div"); c.style.cssText = "background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:6px 8px;margin-bottom:6px"
+    const c = document.createElement("div"); c.style.cssText = "background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:8px 10px;margin-bottom:6px"
     const a = document.createElement("div"); a.style.fontSize = "12.5px"; a.textContent = t.current_action; c.appendChild(a)
-    const pill = document.createElement("div"); pill.className = "hint"; pill.style.marginTop = "4px"
-    pill.innerHTML = '<span style="color:' + (TASK_STATUS_COLOR[t.status] || "var(--ink-dim)") + '">● ' + t.status + "</span>"; c.appendChild(pill)
+    const pill = document.createElement("div"); pill.className = "hint"
+    pill.style.cssText = "margin-top:4px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap"
+    pill.innerHTML = '<span style="color:' + (TASK_STATUS_COLOR[t.status] || "var(--ink-dim)") + '">● ' + esc(t.status) + "</span>"
+    const chip = reviewChip(t); if (chip) pill.appendChild(chip)
+    c.appendChild(pill)
     if (t.status === "open" || t.status === "stalled") {
-      // Horizon is now set by dragging the card between the now/next/later columns
-      // (piece #2); the dropdown was removed per feedback. Only done/abandon remain.
-      makeDraggable(c, "task", t.id, t.horizon)
-      const acts = document.createElement("div"); acts.className = "acts"; acts.style.marginTop = "5px"
-      acts.appendChild(mkBtn("✓ done", "btn-accept", () => taskAct(t.id, "completed")))
-      acts.appendChild(mkBtn("✕", "btn-reject", () => taskAct(t.id, "abandoned")))
+      // No longer draggable: the now/next/later columns it was dragged between are gone.
+      const acts = document.createElement("div"); acts.className = "acts"; acts.style.marginTop = "6px"
+      const b = (label, cls, fn) => { const x = mkBtn(label, cls + " mini", fn); x.style.marginTop = "0"; return x }
+      acts.appendChild(b("done", "btn-accept", () => taskAct(t.id, "completed")))
+      acts.appendChild(b("drop", "btn-reject", () => taskAct(t.id, "abandoned")))
+      acts.appendChild(b("still live", "btn-snooze", () => renewTask(t.id)))
       c.appendChild(acts)
     }
     return c
+  }
+
+  // "Still live" — the third answer the clock asks for. It resets review_at and increments
+  // review_count, and it writes a chain-registered feedback_event, so a session that renews
+  // owes audit_verify + an anchor at close, exactly as a disposal does.
+  async function renewTask(id, days) {
+    try {
+      await api("renew_task", { task_id: id, days: days || 14 })
+      refreshAfterTaskChange()
+    } catch (e) {
+      alert(/404|unknown op|HTTP 404/i.test(e.message)
+        ? "renew_task isn’t deployed yet — ships with the pending console deploy."
+        : e.message)
+    }
   }
 
   async function setStage(propId, personId, stage) {
@@ -2866,9 +3018,6 @@
   async function setPropStatus(propId, status) {
     try { await api("update_proposition", { proposition_id: propId, status }); loadPropositions(); openProposition(propId) }
     catch (e) { alert(e.message) }
-  }
-  async function moveTaskHorizon(taskId, horizon) {
-    try { await api("update_task", { task_id: taskId, horizon }); openProposition(PROP_OPEN) } catch (e) { alert(e.message) }
   }
   async function taskAct(taskId, status) {
     try { await api("update_task", { task_id: taskId, status, comment: "via console propositions tab" }); openProposition(PROP_OPEN) } catch (e) { alert(e.message) }
@@ -3782,11 +3931,21 @@
   $("rel_text").addEventListener("keydown", (e) => { if (e.key === "Enter") runRelevance() })
   $("p_createBtn").addEventListener("click", createProposition)
   $("composeClose").addEventListener("click", closeCompose)
-  // Candidates load on first open of the picker, not on every visit to the tab — the op
-  // reads three tables and the picker is closed most of the time.
-  $("mergePicker").addEventListener("toggle", () => {
-    if ($("mergePicker").open && !MG_CANDS.length) loadMergeCandidates()
-  })
+  // The two composers are now heading-line toggles rather than <details> (Day 141), so the
+  // open/close state is a class. Opening one closes the other: they are alternatives, and two
+  // long forms stacked above the list pushes the list itself off the screen.
+  function togglePropBox(which) {
+    const boxes = { new: $("propNewBox"), merge: $("mergePicker") }
+    const opening = boxes[which].classList.contains("hidden")
+    for (const k of Object.keys(boxes)) boxes[k].classList.toggle("hidden", !(opening && k === which))
+    $("propNewToggle").classList.toggle("active", opening && which === "new")
+    $("propMergeToggle").classList.toggle("active", opening && which === "merge")
+    // Candidates load on first open of the picker, not on every visit to the tab — the op
+    // reads three tables and the picker is closed most of the time.
+    if (opening && which === "merge" && !MG_CANDS.length) loadMergeCandidates()
+  }
+  $("propNewToggle").addEventListener("click", () => togglePropBox("new"))
+  $("propMergeToggle").addEventListener("click", () => togglePropBox("merge"))
   $("mg_refreshBtn").addEventListener("click", loadMergeCandidates)
   $("mg_openBtn").addEventListener("click", openMergeComposer)
   $("mergeClose").addEventListener("click", closeMergeComposer)
