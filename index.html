@@ -107,6 +107,9 @@
      min-content width (thesis wraps one-word-per-line) unless given an explicit
      width. Without it the rail collapses to ~105px inside its 312px column. */
   .rail { max-height: 72vh; overflow-y: auto; width: 100%; }
+  /* The Propositions rail carries two stacked lists (propositions, then floating tasks), so
+     72vh cuts the lower one off before it starts. Give it the taller measure. */
+  #propRail { max-height: 132vh; }
   .rail-item { padding: 13px 16px; border-top: 1px solid var(--line); cursor: pointer; }
   .rail-item:hover { background: rgba(244,240,233,.03); }
   .rail-item.sel { background: rgba(198,165,83,.08); box-shadow: inset 2px 0 0 var(--gold); }
@@ -586,7 +589,6 @@
     <div id="propositionsView" class="hidden">
     <div class="panel">
       <h2>Propositions <button class="ghost mini" id="propRefresh" style="margin-left:10px">refresh</button></h2>
-      <p class="hint">Durable workspaces — one per Compass product, plus multi-stakeholder projects. Fold theses in to enrich them; tasks sit by horizon; stakeholders advance across the board. Advancing a stakeholder's stage writes a chain-registered signal (the relationship trajectory).</p>
       <details style="margin-top:10px">
         <summary class="hint" style="cursor:pointer">+ new proposition</summary>
         <div style="margin-top:8px">
@@ -2708,28 +2710,41 @@
       const ts = document.createElement("div"); ts.style.cssText = "font-style:italic;color:var(--ink-dim);margin:4px 0 10px"
       ts.textContent = "“" + p.thesis_statement + "”"; host.appendChild(ts)
     }
-    // ✧ reframe the thesis (currents #2) — rewordings arrive as soundings to dispose in.
-    const rfSlot = document.createElement("div"); rfSlot.style.margin = "0 0 10px"
-    const rfBtn = mkBtn("✧ Reframe thesis", "btn-edit", () =>
-      openReframe("proposition", p.id, p.thesis_statement || p.title, rfSlot, async (text) => {
+    // Day 141 — three rows, grouped by what the control DOES, not by when it was built.
+    // They used to be scattered: reframe/lineage/history at the top, review-description and
+    // restructure-tasks buried below the horizon lanes, fold-a-thesis at the very bottom of
+    // the page. Four buttons that all reshape this proposition sat in three different places.
+    //
+    //   1. ACT     — the four that change the proposition. One shared slot, so opening a
+    //                second proposal replaces the first instead of stacking panels.
+    //   2. READ    — lineage and history, unchanged: read-only viewers, their own slot.
+    //   3. OUTCOME — the lifecycle verbs. Last, and quiet, because they close the thing.
+    const actSlot = document.createElement("div"); actSlot.style.margin = "0 0 4px"
+    const act = document.createElement("div"); act.className = "acts"; act.style.marginTop = "10px"
+    act.appendChild(mkBtn("Reframe thesis", "btn-edit", () =>
+      openReframe("proposition", p.id, p.thesis_statement || p.title, actSlot, async (text) => {
         await api("update_proposition", { proposition_id: p.id, thesis_statement: text }); openProposition(p.id)
-      }))
-    rfBtn.style.marginTop = "0"
-    host.appendChild(rfBtn)
+      })))
+    act.appendChild(mkBtn("Review description", "btn-edit", () => openDescriptionReview(p.id, actSlot)))
+    act.appendChild(mkBtn("Restructure tasks", "btn-edit", () => openRestructure(p.id, actSlot)))
+    act.appendChild(mkBtn("Fold a pending thesis", "btn-edit", () => openFoldPicker(p, actSlot)))
+    host.appendChild(act); host.appendChild(actSlot)
+
     // Lineage (§5). Present on every proposition: the op answers "was this folded from
     // anything" for propositions that were not, which is itself the reading.
     const lnSlot = document.createElement("div"); lnSlot.dataset.open = "0"; lnSlot.style.margin = "0 0 10px"
-    const lnBtn = mkBtn("⑃ Lineage", "btn-edit", () => openLineage(p.id, lnSlot))
-    lnBtn.style.cssText = "margin-top:0;margin-left:8px"
-    // ⧉ History (Day 140 follow-up): what the description used to say. Sits beside Reframe
-    // because it is the counterweight to it — every rewrite from here or from the description
-    // review is recorded, so neither is a one-way door any more.
-    const hsBtn = mkBtn("⧉ History", "btn-edit", () => openPropHistory(p.id, lnSlot))
-    hsBtn.style.cssText = "margin-top:0;margin-left:8px"
-    host.appendChild(lnBtn); host.appendChild(hsBtn); host.appendChild(rfSlot); host.appendChild(lnSlot)
+    const read = document.createElement("div"); read.className = "acts"; read.style.marginTop = "10px"
+    read.appendChild(mkBtn("Lineage", "btn-snooze", () => openLineage(p.id, lnSlot)))
+    // History (Day 140 follow-up): what the description used to say — the counterweight to
+    // Reframe and Review description, so neither is a one-way door.
+    read.appendChild(mkBtn("History", "btn-snooze", () => openPropHistory(p.id, lnSlot)))
+    host.appendChild(read); host.appendChild(lnSlot)
 
-    // lifecycle
-    const life = document.createElement("div"); life.className = "acts"; life.style.marginBottom = "10px"
+    // Outcome / lifecycle.
+    const life = document.createElement("div"); life.className = "acts"; life.style.margin = "10px 0 4px"
+    const lifeLab = document.createElement("span"); lifeLab.className = "hint"
+    lifeLab.style.cssText = "margin:0 4px 0 0;align-self:center"; lifeLab.textContent = "outcome"
+    life.appendChild(lifeLab)
     for (const s of ["active", "paused", "won", "dropped", "archived"]) {
       if (s === p.status) continue
       life.appendChild(mkBtn(s, "btn-snooze", () => setPropStatus(p.id, s)))
@@ -2795,21 +2810,14 @@
       host.appendChild(tog)
     }
 
-    // Two-step flow (Day 140). Step 1 re-derives the description from the tasks; step 2
-    // restructures the tasks against it. Ordered left to right, and step 2 reads whatever
-    // step 1 wrote, so running them in order is the only coupling they need.
-    // Both render unconditionally, so the server stays the single invariant holder and the
-    // client does not grow a second copy of the "needs 2+ open tasks" rule.
-    const rsSlot = document.createElement("div"); rsSlot.style.margin = "10px 0 0"
-    const dsBtn = mkBtn("⟳ Review description", "btn-edit", () => openDescriptionReview(p.id, rsSlot))
-    dsBtn.style.marginTop = "0"
-    const rsBtn = mkBtn("⟳ Restructure tasks", "btn-edit", () => openRestructure(p.id, rsSlot))
-    rsBtn.style.cssText = "margin-top:0;margin-left:8px"
-    host.appendChild(dsBtn); host.appendChild(rsBtn); host.appendChild(rsSlot)
+    // Review description / Restructure tasks / Fold a thesis all moved to the ACT row at the
+    // top (Day 141). They are still a two-step flow — step 2 reads whatever step 1 wrote to
+    // the description — and both still render unconditionally, so the server stays the single
+    // holder of the "needs 2+ open tasks" rule and the client grows no second copy of it.
 
     // folded theses
     host.appendChild(propSection("Theses folded in · " + p.theses.length))
-    if (!p.theses.length) { const e = document.createElement("div"); e.className = "hint"; e.textContent = "none — fold one below to enrich this proposition"; host.appendChild(e) }
+    if (!p.theses.length) { const e = document.createElement("div"); e.className = "hint"; e.textContent = "none — use “Fold a pending thesis” above to enrich this proposition"; host.appendChild(e) }
     for (const th of p.theses) {
       const row = document.createElement("div"); row.className = "pending-card"
       const a = document.createElement("div"); a.style.fontSize = "13.5px"; a.textContent = th.suggested_action; row.appendChild(a)
@@ -2817,8 +2825,6 @@
       m.textContent = th.status + (th.fit_flag ? " · " + th.fit_flag : ""); row.appendChild(m)
       host.appendChild(row)
     }
-    const foldWrap = document.createElement("div"); foldWrap.style.marginTop = "10px"
-    foldWrap.appendChild(mkBtn("+ fold a pending thesis", "btn-edit", () => openFoldPicker(p))); host.appendChild(foldWrap)
   }
 
   function stakeholderCard(p, s) {
@@ -2893,9 +2899,14 @@
     catch (e) { alert(e.message) }
   }
 
-  async function openFoldPicker(p) {
+  // mount is the shared ACT slot (Day 141) — the picker replaces whatever proposal was open
+  // there, rather than appending to the bottom of a page the button no longer sits on.
+  async function openFoldPicker(p, mount) {
+    mount.innerHTML = '<p class="hint">reading pending theses…</p>'
     let sugs = []
-    try { const r = await api("list_suggestions", {}); sugs = r.suggestions || [] } catch (e) { alert(e.message); return }
+    try { const r = await api("list_suggestions", {}); sugs = r.suggestions || [] }
+    catch (e) { mount.innerHTML = '<p class="out err" style="display:block">' + esc(e.message) + "</p>"; return }
+    mount.innerHTML = ""
     const wrap = document.createElement("div"); wrap.className = "inline-edit"
     const lab = document.createElement("label"); lab.textContent = "Fold a pending thesis into this proposition (its org attaches too)"; wrap.appendChild(lab)
     if (!sugs.length) { const e = document.createElement("p"); e.className = "hint"; e.textContent = "No pending theses right now."; wrap.appendChild(e) }
@@ -2903,7 +2914,7 @@
       const b = mkBtn("⤵ " + (s.suggested_action || "(thesis)").slice(0, 100), "btn-edit", () => foldOne(p.id, s.id))
       b.style.cssText = "text-align:left;display:block;width:100%"; wrap.appendChild(b)
     }
-    $("propDetail").appendChild(wrap); wrap.scrollIntoView({ block: "nearest" })
+    mount.appendChild(wrap); wrap.scrollIntoView({ block: "nearest" })
   }
   async function foldOne(propId, sugId) {
     try { await api("fold_thesis", { proposition_id: propId, suggestion_id: sugId }); openProposition(propId) }
