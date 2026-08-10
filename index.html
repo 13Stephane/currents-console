@@ -29,7 +29,10 @@
   /* 672px = the old 720px wrap minus its 2×24px padding: the form/prose views keep
      the exact column width they had before the wrap was widened. Only the Theses
      split-reader (and, later, the Propositions split) uses the full width. */
-  #gatePanel, #addView, #tasksView, #newsView, #propositionsView { max-width: 672px; }
+  #gatePanel, #addView, #tasksView { max-width: 672px; }
+  /* News and Propositions are two-pane readers, so their split runs the full width —
+     but their explainer/filter panel is prose and keeps a reading measure. */
+  #newsView > .panel, #propositionsView > .panel { max-width: 760px; }
   .mono { font-family: "IBM Plex Mono", "SF Mono", ui-monospace, Menlo, monospace; }
   .head { display: flex; align-items: baseline; justify-content: space-between; gap: 18px;
     border-bottom: 1px solid var(--line); padding-bottom: 16px; margin-bottom: 28px; flex-wrap: wrap; }
@@ -49,9 +52,13 @@
   }
   input:focus, textarea:focus, select:focus { outline: none; border-color: var(--gold); }
   textarea { resize: vertical; min-height: 68px; line-height: 1.45; }
+  /* Control grammar (Day 141): shape carries meaning, so a tab and a button must not
+     share one. An ACTION is a pill — rounded, self-contained, something you press. A
+     PLACE (see .nav below) is rectangular and unenclosed. The radius is the tell at a
+     glance, before any label is read. */
   button {
     font-family: "IBM Plex Mono", monospace; font-size: 12px; letter-spacing: .04em;
-    background: var(--gold); color: var(--bg); border: 1px solid var(--gold); border-radius: 2px;
+    background: var(--gold); color: var(--bg); border: 1px solid var(--gold); border-radius: 999px;
     padding: 9px 18px; cursor: pointer; margin-top: 18px; transition: border-color .15s, color .15s, background .15s;
   }
   button.ghost { background: transparent; color: var(--ink-dim); border-color: var(--line); }
@@ -77,10 +84,21 @@
 
   /* §3.4 disposal surface — view nav + split-reader (Layout C) */
   .nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 26px; }
-  .nav button { margin-top: 0; background: transparent; color: var(--ink-dim); border-color: var(--line); }
-  .nav button.active { border-color: var(--gold); background: var(--gold); color: var(--bg); font-weight: 500; }
+  /* A tab is a PLACE, not an act (see the button rule above): no enclosing box, just a
+     rule above and below, and a filled gold rectangle when you are standing in it. The
+     square corners are load-bearing — they are what separates it from a pill action. */
+  .nav button {
+    margin-top: 0; background: transparent; color: var(--ink-dim); font-weight: 500;
+    letter-spacing: .1em; border-radius: 0;
+    border: 1px solid transparent; border-top-color: var(--line); border-bottom-color: var(--line);
+  }
+  .nav button:hover { color: var(--ink); border-top-color: var(--gold); border-bottom-color: var(--gold); }
+  .nav button.active { background: var(--gold); color: var(--bg); border-color: var(--gold); }
   .split { display: grid; grid-template-columns: 312px minmax(0,1fr) 290px; gap: 18px; align-items: start; }
-  @media (max-width: 940px) { .split { grid-template-columns: 1fr; } }
+  /* Two-pane reader: a scrolling list on the left, the selected object on the right.
+     Used by Propositions and News; the three-column .split stays the Theses layout. */
+  .split-2 { grid-template-columns: 336px minmax(0,1fr); }
+  @media (max-width: 940px) { .split, .split-2 { grid-template-columns: 1fr; } }
   .col { border: 1px solid var(--line); border-radius: 3px; background: rgba(244,240,233,.02); }
   .col-h { font-family: "IBM Plex Mono", monospace; font-size: 10px; letter-spacing: .16em;
     text-transform: uppercase; color: var(--ink-faint); padding: 14px 16px 10px; }
@@ -336,6 +354,20 @@
       <div id="find_add" style="margin-top:12px"></div>
     </div>
 
+    <!-- Day 141 · the reverse of Find. Find answers "who is this person I already know";
+         this answers "who, of everyone I know, belongs on this piece of work". Read-only:
+         it ranks and shows the grounding, and writes nothing. -->
+    <div class="panel" id="relevancePanel">
+      <h2>Who fits this work?</h2>
+      <p class="hint">Pick a proposition or an open task — or paste any text — and Currents ranks the people whose <em>current</em> drivers and needs sit closest to it, showing the signal that made each one rank. <strong>Read-only.</strong> It proposes names; it writes nothing, mints no thesis, and routes nothing into your feed. Acting on a name is a separate, deliberate step.</p>
+      <label>Against</label>
+      <select id="rel_target"><option value="">— pick a proposition or task —</option></select>
+      <label>Or any text</label>
+      <input id="rel_text" placeholder="an intent, a topic, a positioning line…" autocomplete="off">
+      <button id="rel_btn">Rank people</button>
+      <div id="rel_out" style="margin-top:4px"></div>
+    </div>
+
     <div class="panel" id="addPersonPanel">
       <h2>Add person</h2>
       <label>Full name *</label>
@@ -536,7 +568,18 @@
         <button data-sort="relevance" title="Pure fit score, ignores age">Relevance</button>
         <button data-sort="newest" title="Most recently observed first">Newest</button>
       </div>
-      <div id="newsList"></div>
+    </div>
+    <!-- Two-pane reader (Day 141): headlines scan on the left, everything that asks for a
+         decision — so-what, provenance, analysis, actions — reads on the right. The old
+         single column interleaved a 200-word summary and six buttons between consecutive
+         headlines, so scanning the gate meant scrolling past the reasoning for stories
+         already rejected by eye. -->
+    <div class="split split-2">
+      <div class="col">
+        <div class="col-h">Headlines <span id="newsCount"></span></div>
+        <div class="rail" id="newsRail"></div>
+      </div>
+      <div class="col detail" id="newsDetail"><p class="empty">Select a headline.</p></div>
     </div>
     </div><!-- /newsView -->
 
@@ -568,10 +611,18 @@
           <div class="out" id="mg_pickOut"></div>
         </div>
       </details>
-      <div id="propList" style="margin-top:14px"></div>
     </div>
-    <div class="panel" id="propDetailPanel" style="display:none">
-      <div id="propDetail"></div>
+    <!-- Two-pane reader (Day 141). Left column is one scroll container holding BOTH lists:
+         the propositions, then the floating tasks (proposition_id is null) directly under
+         them. They share a column because they are the same question — "what work is
+         there" — and filing a floater is a move from the lower list into the upper one.
+         The detail pane renders whichever object is selected, so the list is never lost
+         to a scroll the way the old stacked panel lost it. -->
+    <div class="split split-2">
+      <div class="col">
+        <div class="rail" id="propRail"></div>
+      </div>
+      <div class="col detail" id="propDetail"><p class="empty">Select a proposition or a floating task.</p></div>
     </div>
     </div><!-- /propositionsView -->
   </div>
@@ -893,7 +944,52 @@
     // itself (the wrap is centred) — width is now a per-view CSS concern, not a
     // body-class one. See the .wrap comment.
   }
-  function showAdd() { setNav("navAdd"); $("rm_q").focus() }
+  function showAdd() { setNav("navAdd"); $("rm_q").focus(); loadRelevanceTargets() }
+
+  // The relevance selector's option list. Loaded on entering Find/add rather than at unlock,
+  // and refreshed each time, so a proposition or task created earlier in the session is
+  // pickable without a page reload. Failures leave the free-text field usable — the panel
+  // degrades to "paste any text" rather than disappearing.
+  let REL_TARGETS = {}
+  async function loadRelevanceTargets() {
+    const sel = $("rel_target"); if (!sel) return
+    try {
+      const [pr, tr] = await Promise.all([
+        api("list_propositions", {}).catch(() => ({ propositions: [] })),
+        api("list_tasks", {}).catch(() => ({ tasks: [] })),
+      ])
+      REL_TARGETS = {}
+      sel.innerHTML = '<option value="">— pick a proposition or task —</option>'
+      const add = (group, rows, key, label) => {
+        if (!rows.length) return
+        const g = document.createElement("optgroup"); g.label = group
+        for (const row of rows) {
+          REL_TARGETS[key + ":" + row.id] = label(row)
+          const o = document.createElement("option")
+          o.value = key + ":" + row.id
+          o.textContent = (row.title || row.current_action || "(untitled)").slice(0, 70)
+          g.appendChild(o)
+        }
+        sel.appendChild(g)
+      }
+      // A proposition ranks against its positioning text where it has one — that is the
+      // claim people are being matched to. Falling back to the bare title would rank
+      // against a label rather than an intent.
+      add("Propositions", pr.propositions || [], "p", (p) => [p.title, p.thesis_statement].filter(Boolean).join(". "))
+      add("Open tasks", (tr.tasks || []).filter((t) => t.status === "open" || t.status === "stalled"),
+        "t", (t) => t.current_action || "")
+    } catch (_) { /* free-text path still works */ }
+  }
+
+  async function runRelevance() {
+    const key = $("rel_target").value
+    const free = $("rel_text").value.trim()
+    // Free text wins when both are set: it is the more specific thing the operator just typed.
+    const text = free || (key ? REL_TARGETS[key] : "")
+    const out = $("rel_out")
+    if (!text) { out.innerHTML = '<p class="hint">Pick a target or type some text first.</p>'; return }
+    renderRelevantPeople(out, text, { title: free ? "Who fits this text" : "Who fits this work", limit: 10 })
+  }
   // Day 129: the Theses feed can be filtered to one initiative's theses (from Active initiatives).
   // Clicking the Theses NAV tab clears any filter (full feed); the initiative row sets it.
   let SUG_TRIGGER = null, SUG_TRIGGER_TITLE = null
@@ -1805,6 +1901,61 @@
     PERSON_CACHE[pid] = r.person
     return r.person
   }
+  // Day 141 — "who does this concern?", as a reusable read-only panel. Given any text
+  // (a news story, a task's action, a proposition's thesis) the server ranks people by how
+  // their current drivers/needs fit it, and returns the signals that made each one rank.
+  //
+  // It proposes names and stops. No suggestion is minted, nothing enters the disposal feed,
+  // and nothing is written — which is exactly why it needs no floor and no cap ceremony,
+  // unlike a live initiative dispatch. The operator acts on a name through a surface that
+  // already carries the disposal contract; ranking is not routing.
+  async function renderRelevantPeople(mount, text, opts) {
+    opts = opts || {}
+    mount.innerHTML = '<p class="hint">ranking people against this…</p>'
+    let r
+    try { r = await api("relevant_people", { text, limit: opts.limit || 8 }) }
+    catch (e) {
+      mount.innerHTML = '<p class="hint">' + (/404|not found|unknown op|HTTP 404/i.test(e.message)
+        ? "relevant_people isn’t deployed yet — ships with the pending console deploy."
+        : esc(e.message)) + "</p>"
+      return
+    }
+    const people = r.people || []
+    mount.innerHTML = ""
+    const h = document.createElement("p")
+    h.style.cssText = "font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.16em;"
+      + "text-transform:uppercase;color:var(--gold);margin:14px 0 6px"
+    h.textContent = (opts.title || "Who this could involve") + " · " + people.length
+    mount.appendChild(h)
+    const note = document.createElement("p"); note.className = "hint"; note.style.margin = "0 0 8px"
+    note.textContent = "Ranked, not routed — nothing was written. Click a name to read the profile."
+    mount.appendChild(note)
+    if (!people.length) {
+      mount.appendChild(Object.assign(document.createElement("p"),
+        { className: "empty", textContent: "No one ranks against this — the soft layer holds nothing close." }))
+      return
+    }
+    for (const p of people) {
+      const row = document.createElement("div"); row.className = "search-hit"
+      const nm = document.createElement("div"); nm.className = "sh-name"
+      nm.innerHTML = markSpan("person", "mk-person") + " " + esc(p.full_name || "(no name)")
+        + ' <span style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--ink-dim)">fit '
+        + Number(p.best_sim).toFixed(3) + "</span>"
+      row.appendChild(nm)
+      // The signal, not just the score: a name with no visible reason is not something the
+      // operator can judge, and an unjudgeable proposal is the failure mode this whole
+      // console is built against.
+      const sig = (p.top_signals || [])[0]
+      if (sig) {
+        const s = document.createElement("div"); s.className = "sh-meta"
+        s.textContent = "[" + (p.top_kind || "?") + "] " + sig
+        row.appendChild(s)
+      }
+      row.addEventListener("click", () => showProfile(p.person_id))
+      mount.appendChild(row)
+    }
+  }
+
   async function renderGrounding(mount, opts) {
     const sigs = (opts.top_signals || []).filter(Boolean)
     let h = '<div class="grounding">'
@@ -2306,7 +2457,7 @@
       acts.appendChild(mkBtn("✧ Reframe", "btn-edit", () => {
         let slot = card.querySelector(".reframe-slot")
         if (!slot) { slot = document.createElement("div"); slot.className = "reframe-slot inline-edit"; card.appendChild(slot) }
-        openReframe("task", t.id, t.current_action, slot, async (text) => { await api("update_task", { task_id: t.id, current_action: text }); loadTasks() })
+        openReframe("task", t.id, t.current_action, slot, async (text) => { await api("update_task", { task_id: t.id, current_action: text }); refreshAfterTaskChange() })
       }))
       acts.appendChild(taskPropPicker(t))
       card.appendChild(acts)
@@ -2342,18 +2493,27 @@
 
   function esc(s) { const d = document.createElement("div"); d.textContent = s == null ? "" : s; return d.innerHTML }
 
+  // taskCard is now mounted on two tabs (Tasks, and the Propositions floating-task pane),
+  // so a write from it must repaint whichever list the operator is actually looking at.
+  // Repainting the hidden one is the bug this replaces: filing a floater left it sitting
+  // in the floating section, because only the invisible Tasks tab had been refreshed.
+  function refreshAfterTaskChange() {
+    if (!$("propositionsView").classList.contains("hidden")) loadPropositions()
+    else loadTasks()
+  }
+
   async function updateTaskStatus(id, status) {
     try {
       const r = await api("update_task", { task_id: id, status, comment: "via console tasks tab" })
       // r.feedback_event_id present on a real status change (the outcome signal).
-      loadTasks()
+      refreshAfterTaskChange()
     } catch (e) { alert(e.message) }
   }
 
   async function setTaskProposition(taskId, propId) {
     try {
       await api("set_task_proposition", { task_id: taskId, proposition_id: propId })
-      loadTasks()   // re-render so the task hops between Unassigned and its proposition group
+      refreshAfterTaskChange()   // the task hops between Unassigned/floating and its proposition
     } catch (e) { alert(e.message) }
   }
 
@@ -2363,7 +2523,7 @@
     const ta = document.createElement("textarea"); ta.value = t.current_action || ""; slot.appendChild(ta)
     slot.appendChild(mkBtn("Save action", "btn-edit", async () => {
       const v = ta.value.trim(); if (!v || v === t.current_action) { slot.remove(); return }
-      try { await api("update_task", { task_id: t.id, current_action: v }); loadTasks() }
+      try { await api("update_task", { task_id: t.id, current_action: v }); refreshAfterTaskChange() }
       catch (e) { show(card._out, e.message, false) }
     }))
     card.appendChild(slot)
@@ -2374,43 +2534,121 @@
   const STAGE_LABEL = { considering: "Considering", latent: "Latent", active: "Active", committed: "Committed", declined: "Declined", dropped: "Dropped" }
   const STAGE_COLOR = { considering: "var(--ink-faint)", latent: "var(--ink-dim)", active: "var(--gold)", committed: "var(--green)", declined: "var(--reject)", dropped: "var(--reject)" }
   const HORIZONS = ["now", "next", "later"]
-  let PROP_OPEN = null
+  // Exactly one of these is non-null: the detail pane shows a proposition or a floating
+  // task, never both, so selecting one must clear the other.
+  let PROP_OPEN = null, PROP_TASK_OPEN = null
   // Retired tasks are collapsed by default on the proposition board (Day 140). Session state,
   // deliberately not persisted: the useful default is "show me the live work", every time.
   let PROP_SHOW_DONE = false
 
+  // Day 141: propositions and their floating tasks share one scroll container. The list
+  // is fetched with the tasks so the two sections are always one consistent reading —
+  // a floater filed into a proposition has to leave the lower section and be counted in
+  // the upper one in the same repaint, or the column contradicts itself.
+  let PROP_FLOATERS = []
+
   async function loadPropositions() {
-    const host = $("propList"); host.textContent = "loading…"
-    try { const r = await api("list_propositions", {}); renderPropList(r.propositions || []) }
-    catch (e) { host.textContent = e.message }
+    const host = $("propRail"); host.innerHTML = '<p class="empty">loading…</p>'
+    try {
+      const [pr, tr] = await Promise.all([
+        api("list_propositions", {}),
+        api("list_tasks", {}).catch(() => ({ tasks: [] })),
+      ])
+      // taskCard's proposition picker reads TASK_PROPS; populate it here too so a floater
+      // opened from this tab can be filed without first visiting Tasks.
+      TASK_PROPS = pr.propositions || []
+      PROP_FLOATERS = (tr.tasks || []).filter((t) => !t.proposition_id && (t.status === "open" || t.status === "stalled"))
+      renderPropRail(pr.propositions || [])
+    } catch (e) { host.innerHTML = ""; host.textContent = e.message }
   }
 
-  function renderPropList(props) {
-    const host = $("propList"); host.innerHTML = ""
-    if (!props.length) { host.innerHTML = '<p class="hint">No propositions yet. Create one above, then fold theses in from Dispose.</p>'; return }
+  function railGroupHead(text) {
+    const h = document.createElement("div"); h.className = "col-h"
+    h.style.cssText = "border-top:1px solid var(--line);padding-top:13px"
+    h.textContent = text; return h
+  }
+
+  function renderPropRail(props) {
+    const host = $("propRail"); host.innerHTML = ""
+    const ph = document.createElement("div"); ph.className = "col-h"; ph.style.paddingTop = "14px"
+    ph.textContent = "Propositions · " + props.length
+    host.appendChild(ph)
+    if (!props.length) {
+      host.appendChild(Object.assign(document.createElement("p"),
+        { className: "empty", textContent: "None yet — create one above." }))
+    }
     for (const p of props) {
-      const card = document.createElement("div"); card.className = "pending-card"; card.style.cursor = "pointer"
-      const head = document.createElement("div"); head.className = "who"; head.innerHTML = markSpan("inf_hollow", "mk-inf") + " " + esc(p.title)
-      card.appendChild(head)
-      const meta = document.createElement("div"); meta.className = "hint"; meta.style.marginTop = "5px"
-      meta.innerHTML = '<span style="color:var(--gold)">' + esc(p.product || p.kind) + "</span> · " + esc(p.status)
-        + " · " + p.stakeholders + " stakeholder" + (p.stakeholders === 1 ? "" : "s")
-        + " · " + p.orgs + " org" + (p.orgs === 1 ? "" : "s")
-        + " · " + p.tasks_open + " open task" + (p.tasks_open === 1 ? "" : "s")
-        + " · " + p.theses + " thes" + (p.theses === 1 ? "is" : "es")
-      card.appendChild(meta)
-      card.addEventListener("click", () => openProposition(p.id))
-      host.appendChild(card)
+      const row = document.createElement("div"); row.className = "rail-item"
+      row.dataset.pid = p.id
+      if (PROP_OPEN === p.id) row.classList.add("sel")
+      const t = document.createElement("div"); t.className = "rclaim"
+      t.innerHTML = markSpan("inf_hollow", "mk-inf") + " " + esc(p.title)
+      row.appendChild(t)
+      const m = document.createElement("div"); m.className = "rmeta"
+      m.innerHTML = '<span style="color:var(--gold)">' + esc(p.product || p.kind) + "</span>"
+        + " · " + esc(p.status)
+        + " · " + p.tasks_open + " open"
+        + " · " + p.stakeholders + " stkhldr"
+      row.appendChild(m)
+      row.addEventListener("click", () => openProposition(p.id))
+      host.appendChild(row)
+    }
+
+    // Floating tasks: real work that belongs to no workspace. Kept in this column rather
+    // than only on the Tasks tab because the act they are waiting for — filing — is a move
+    // into the list directly above them.
+    host.appendChild(railGroupHead("Floating tasks · " + PROP_FLOATERS.length))
+    if (!PROP_FLOATERS.length) {
+      host.appendChild(Object.assign(document.createElement("p"),
+        { className: "empty", textContent: "None — every open task is filed." }))
+    }
+    for (const t of PROP_FLOATERS) {
+      const row = document.createElement("div"); row.className = "rail-item"
+      row.dataset.tid = t.id
+      if (PROP_TASK_OPEN === t.id) row.classList.add("sel")
+      const a = document.createElement("div"); a.className = "rclaim"
+      a.textContent = t.current_action || "(no action)"
+      row.appendChild(a)
+      const m = document.createElement("div"); m.className = "rmeta"
+      m.innerHTML = '<span style="color:' + (TASK_STATUS_COLOR[t.status] || "var(--ink-dim)") + '">● '
+        + esc(t.status) + "</span>" + (t.horizon ? " · " + esc(t.horizon) : "")
+        + (t.person_name ? " · " + esc(t.person_name) : "")
+      row.appendChild(m)
+      row.addEventListener("click", () => openFloatingTask(t.id))
+      host.appendChild(row)
+    }
+  }
+
+  function paintRailSelection() {
+    const host = $("propRail"); if (!host) return
+    for (const el of host.querySelectorAll(".rail-item")) {
+      // Boolean(), not a bare && chain: a proposition row has no dataset.tid, so the
+      // second operand evaluates to `undefined`, and classList.toggle treats an
+      // `undefined` force argument as "no argument given" — it FLIPS the class instead
+      // of clearing it. That silently left a second proposition reading as selected.
+      const sel = (el.dataset.pid != null && el.dataset.pid === PROP_OPEN)
+        || (el.dataset.tid != null && el.dataset.tid === PROP_TASK_OPEN)
+      el.classList.toggle("sel", sel)
     }
   }
 
   async function openProposition(id) {
-    PROP_OPEN = id
-    const panel = $("propDetailPanel"), host = $("propDetail")
-    panel.style.display = "block"; host.textContent = "loading…"
+    PROP_OPEN = id; PROP_TASK_OPEN = null; paintRailSelection()
+    const host = $("propDetail"); host.innerHTML = '<p class="empty">loading…</p>'
     try { const r = await api("get_proposition", { proposition_id: id }); renderPropDetail(r.proposition) }
-    catch (e) { host.textContent = e.message }
-    panel.scrollIntoView({ behavior: "smooth", block: "start" })
+    catch (e) { host.innerHTML = ""; host.textContent = e.message }
+  }
+
+  // A floating task opens in the same detail pane, using the Tasks-tab card so there is one
+  // task-editing surface in the console rather than a second, divergent one.
+  function openFloatingTask(id) {
+    PROP_TASK_OPEN = id; PROP_OPEN = null; paintRailSelection()
+    const host = $("propDetail"); host.innerHTML = ""
+    const t = PROP_FLOATERS.find((x) => x.id === id)
+    if (!t) { host.innerHTML = '<p class="empty">—</p>'; return }
+    const h = document.createElement("div"); h.className = "subject"; h.textContent = "floating task · no proposition"
+    host.appendChild(h)
+    host.appendChild(taskCard(t))
   }
 
   function propSection(t) {
@@ -3292,107 +3530,119 @@
   }
 
   async function loadNews() {
-    const host = $("newsList"); host.textContent = "loading…"
+    const host = $("newsRail"); host.innerHTML = '<p class="empty">loading…</p>'
     try {
       const r = await api("list_news", { state: NEWS_STATE, sort: NEWS_SORT, limit: 100 })
       renderNews(r.news || [])
     } catch (e) { host.textContent = e.message }
   }
 
+  // Two-pane News (Day 141). The rail carries only what you scan by — score, state,
+  // headline. Everything that argues for a decision lives in the detail pane.
+  let NEWS_CACHE = [], NEWS_SEL = null
+
   function renderNews(items) {
-    const host = $("newsList"); host.innerHTML = ""
-    if (!items.length) { host.innerHTML = '<p class="hint">Nothing in this bucket.</p>'; return }
-    // Day 126 (feedback #2): a story that has already produced theses has flowed into
-    // the Theses feed — it's been acted on. Render it as one collapsed line (expandable)
-    // so the gate shows what still needs review, not what's already downstream.
-    // Day 127: also collapse a story the operator turned into a landscape thesis
-    // (has_thesis), a hypothesis-less path the count-based test misses — this is the
-    // fix for "I turn it into a thesis and it comes back next session with no marker".
-    for (const it of items) host.appendChild((it.hypothesis_count > 0 || it.has_thesis) ? newsCardCollapsed(it) : newsCard(it))
+    NEWS_CACHE = items
+    const host = $("newsRail"); host.innerHTML = ""
+    $("newsCount").textContent = items.length ? "· " + items.length : ""
+    if (!items.length) {
+      host.innerHTML = '<p class="empty">Nothing in this bucket.</p>'
+      $("newsDetail").innerHTML = '<p class="empty">—</p>'; NEWS_SEL = null; return
+    }
+    for (const it of items) host.appendChild(newsRailItem(it))
+    // Hold the open story across a refresh where it survives the filter; otherwise open
+    // the top of the list, so the pane is never empty next to a populated rail.
+    const keep = NEWS_SEL && items.some((x) => x.event_id === NEWS_SEL)
+    selectNews(keep ? NEWS_SEL : items[0].event_id)
   }
 
-  // One-line form of a news card: score · title · "N theses ›". Click to expand to the
-  // full card in place. Used for already-actioned stories and after "turn into thesis".
-  function newsCardCollapsed(it) {
-    const row = document.createElement("div")
-    row.style.cssText = "border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin-bottom:8px;display:flex;gap:10px;align-items:baseline;cursor:pointer;opacity:.7"
-    row.title = "Already in your Theses feed — click to expand"
-    const score = document.createElement("span")
-    score.style.cssText = "font-variant-numeric:tabular-nums;color:var(--ink-dim);font-size:12px"
-    score.textContent = (it.fit_score == null ? "—" : Number(it.fit_score).toFixed(3))
-    const title = document.createElement("span")
-    title.style.cssText = "font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
-    title.textContent = it.title || "(untitled)"
-    const badge = document.createElement("span")
-    badge.style.cssText = "color:var(--green);font-size:12px;white-space:nowrap"
-    // Day 127: an operator "→ thesis" (has_thesis) is the explicit landscape action, so it
-    // leads the badge; else the resonator's per-person count. Either way the story is actioned.
-    badge.textContent = (it.has_thesis
-      ? "→ thesis"
-      : it.hypothesis_count
-        ? it.hypothesis_count + " thes" + (it.hypothesis_count === 1 ? "is" : "es")
-        : "in theses") + " ›"
-    row.append(score, title, badge)
-    row.onclick = () => row.replaceWith(newsCard(it))
+  // Day 126 (feedback #2) / Day 127, carried into the rail: a story that already produced
+  // theses — or that the operator turned into a landscape thesis — has flowed downstream.
+  // It keeps its place in the list but reads as spent, because the gate is for what still
+  // needs a decision.
+  function newsActioned(it) { return it.hypothesis_count > 0 || it.has_thesis }
+
+  function newsRailItem(it) {
+    const row = document.createElement("div"); row.className = "rail-item"
+    row.dataset.eid = it.event_id
+    if (it.event_id === NEWS_SEL) row.classList.add("sel")
+    const t = document.createElement("div"); t.className = "rclaim"
+    t.textContent = it.title || "(untitled)"
+    row.appendChild(t)
+    const m = document.createElement("div"); m.className = "rmeta"
+    const col = NEWS_STATE_COLOR[it.fit_state] || "var(--ink-dim)"
+    m.innerHTML = '<span style="font-variant-numeric:tabular-nums">'
+      + (it.fit_score == null ? "—" : Number(it.fit_score).toFixed(3)) + "</span>"
+      + ' <span style="color:' + col + '">' + esc(it.fit_state || "") + "</span>"
+      + (newsActioned(it)
+        ? ' <span style="color:var(--green)">' + (it.has_thesis ? "→ thesis" : it.hypothesis_count + " theses") + "</span>"
+        : "")
+    row.appendChild(m)
+    if (newsActioned(it)) row.style.opacity = ".6"
+    row.addEventListener("click", () => selectNews(it.event_id))
     return row
   }
 
-  function newsCard(it) {
-    const card = document.createElement("div")
-    card.style.cssText = "border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:10px"
+  function selectNews(eid) {
+    NEWS_SEL = eid
+    for (const el of $("newsRail").querySelectorAll(".rail-item")) el.classList.toggle("sel", el.dataset.eid === eid)
+    const it = NEWS_CACHE.find((x) => x.event_id === eid)
+    const d = $("newsDetail"); d.innerHTML = ""
+    if (!it) { d.innerHTML = '<p class="empty">—</p>'; return }
 
-    const head = document.createElement("div"); head.style.cssText = "display:flex;gap:10px;align-items:baseline;flex-wrap:wrap"
-    const score = document.createElement("span")
-    score.style.cssText = "font-variant-numeric:tabular-nums;color:var(--ink-dim)"
-    score.textContent = (it.fit_score == null ? "—" : Number(it.fit_score).toFixed(3))
+    const head = document.createElement("div"); head.className = "subject"
+    head.textContent = [(it.source_kind || "news"), (it.observed_at || "").slice(0, 10),
+      (it.fit_score == null ? null : "fit " + Number(it.fit_score).toFixed(3))].filter(Boolean).join(" · ")
+    d.appendChild(head)
+
     const st = document.createElement("span"); st.textContent = it.fit_state
     st.title = NEWS_STATE_TIP[it.fit_state] || ""
     const col = NEWS_STATE_COLOR[it.fit_state] || "var(--ink-dim)"
-    st.style.cssText = "font-size:12px;padding:1px 8px;border:1px solid " + col + ";color:" + col + ";border-radius:10px;cursor:help"
-    const meta = document.createElement("span"); meta.style.cssText = "color:var(--ink-dim);font-size:12px"
-    meta.textContent = (it.source_kind || "news") + " · " + (it.observed_at || "").slice(0, 10) + (it.hypothesis_count ? " · " + it.hypothesis_count + " theses" : "")
-    head.append(score, st, meta)
+    st.style.cssText = "display:inline-block;margin:10px 0 0;font-family:'IBM Plex Mono',monospace;font-size:11px;"
+      + "padding:1px 10px;border:1px solid " + col + ";color:" + col + ";border-radius:10px;cursor:help"
+    d.appendChild(st)
 
-    const title = document.createElement("div"); title.style.cssText = "margin:6px 0 2px;font-weight:600"
-    if (it.url) { const a = document.createElement("a"); a.href = it.url; a.target = "_blank"; a.rel = "noopener"; a.style.color = "inherit"; a.textContent = it.title || "(untitled)"; title.appendChild(a) }
-    else title.textContent = it.title || "(untitled)"
+    const title = document.createElement("div"); title.className = "claim"
+    if (it.url) {
+      const a = document.createElement("a"); a.href = it.url; a.target = "_blank"; a.rel = "noopener"
+      a.style.cssText = "color:inherit;text-decoration:none;border-bottom:1px solid var(--line)"
+      a.textContent = it.title || "(untitled)"; title.appendChild(a)
+    } else title.textContent = it.title || "(untitled)"
+    d.appendChild(title)
 
-    const summary = document.createElement("div"); summary.style.cssText = "color:var(--ink-dim);font-size:13px;margin-bottom:8px"
-    summary.textContent = (it.summary || "").slice(0, 220)
+    // The implication reads before the publisher's own blurb. Generated on open rather
+    // than on scroll: opening the story IS the demand signal, so nothing is generated
+    // for headlines the operator only scanned past in the rail.
+    const sw = document.createElement("div")
+    sw.style.cssText = "color:var(--gold);font-size:13.5px;font-style:italic;margin:0 0 12px"
+    if (it.so_what) sw.textContent = "So what — " + it.so_what
+    else { sw.style.color = "var(--ink-faint)"; sw.textContent = "So what — …"; ensureSoWhat(it, sw) }
+    d.appendChild(sw)
 
-    const actions = document.createElement("div"); actions.style.cssText = "display:flex;gap:8px;flex-wrap:wrap"
-    const mk = (label, action, cls) => { const b = document.createElement("button"); b.className = cls; b.textContent = label; b.onclick = () => disposeNews(it.event_id, action); return b }
-    // State transitions: parked/held → Validate (back into flow); eligible → Hold/Park (set aside).
+    if (it.summary) {
+      const sm = document.createElement("div"); sm.className = "rationale"; sm.textContent = it.summary
+      d.appendChild(sm)
+    }
+
+    const actions = document.createElement("div"); actions.className = "acts"
+    const mk = (label, action, cls) => {
+      const b = document.createElement("button"); b.className = cls; b.textContent = label
+      b.onclick = () => disposeNews(it.event_id, action); return b
+    }
     if (it.fit_state === "held") actions.append(mk("Validate", "validate", "mini"), mk("Park", "park", "mini ghost"))
     else if (it.fit_state === "parked") actions.append(mk("Validate", "validate", "mini"), mk("Hold", "hold", "mini ghost"))
-    else actions.append(mk("Hold", "hold", "mini ghost"), mk("Park", "park", "mini ghost"))  // eligible / validated
-    // Per-item actions (Day 123): turn the story into a disposable theme thesis, or
-    // analyze what it already touches. Independent of fit_state.
-    const thBtn = document.createElement("button"); thBtn.className = "mini ghost"; thBtn.innerHTML = markSpan("inf_hollow", "mk-inf") + " thesis"
-    thBtn.title = "Turn into a landscape thesis in your Theses feed"; thBtn.onclick = () => newsToThesis(it, card, thBtn)
-    const anBtn = document.createElement("button"); anBtn.className = "mini ghost"; anBtn.textContent = "⊙ analyze"
-    anBtn.onclick = () => analyzeEvent(it.event_id, card)
-    actions.append(thBtn, anBtn)
+    else actions.append(mk("Hold", "hold", "mini ghost"), mk("Park", "park", "mini ghost"))
+    const thBtn = document.createElement("button"); thBtn.className = "mini ghost"
+    thBtn.innerHTML = markSpan("inf_hollow", "mk-inf") + " thesis"
+    thBtn.title = "Turn into a landscape thesis in your Theses feed"
+    thBtn.onclick = () => newsToThesis(it, thBtn)
+    const anBtn = document.createElement("button"); anBtn.className = "mini ghost"; anBtn.textContent = "Analyze"
+    d.appendChild(actions)
 
-    // Analyze panel sits directly under the title (Day 126, feedback #1) so the
-    // analysis is the first thing read, not buried below summary + action buttons.
-    // Margin is applied only when open (see analyzeEvent) so an empty slot adds no gap.
-    const slot = document.createElement("div"); slot.className = "news-analyze"
-    // Day 129 (News #4): the one-line "so what?" — rendered when cached, else lazily generated
-    // when the card scrolls into view (true on-demand + cache). Sits under the analyze slot,
-    // above the publisher blurb, so the implication reads before the raw feed summary.
-    const sw = document.createElement("div")
-    if (it.so_what) {
-      sw.style.cssText = "color:var(--gold);font-size:13px;font-style:italic;margin:2px 0 8px"
-      sw.textContent = "So what — " + it.so_what
-    } else {
-      sw.style.cssText = "color:var(--ink-faint);font-size:13px;font-style:italic;margin:2px 0 8px"
-      sw.textContent = "So what — …"
-      card.__news = it; card.__swline = sw
-      const obs = soWhatObserver(); if (obs) obs.observe(card); else ensureSoWhat(it, sw)
-    }
-    card.append(head, title, slot, sw, summary, actions)
-    return card
+    const slot = document.createElement("div"); slot.className = "news-analyze"; slot.dataset.open = "0"
+    anBtn.onclick = () => analyzeEvent(it.event_id, slot)
+    actions.append(thBtn, anBtn)
+    d.appendChild(slot)
   }
 
   async function disposeNews(eventId, action) {
@@ -3400,22 +3650,11 @@
     catch (e) { alert(e.message) }
   }
 
-  // Day 129 (News #4): lazily fill the "so what?" line when a card enters the viewport — only
-  // stories actually looked at get generated (on-demand), and each is cached server-side on
+  // Day 129 (News #4): fill the "so what?" line on demand — each is cached server-side on
   // world_event_fit so it never regenerates. Degrades silently pre-deploy (op 404 → line hidden).
-  let SOWHAT_OBS = null
-  function soWhatObserver() {
-    if (SOWHAT_OBS) return SOWHAT_OBS
-    if (!("IntersectionObserver" in window)) return null
-    SOWHAT_OBS = new IntersectionObserver((entries, obs) => {
-      for (const en of entries) {
-        if (!en.isIntersecting) continue
-        obs.unobserve(en.target)
-        ensureSoWhat(en.target.__news, en.target.__swline)
-      }
-    }, { rootMargin: "150px" })
-    return SOWHAT_OBS
-  }
+  // Day 141: the viewport IntersectionObserver that used to trigger this is gone with the old
+  // one-column list. Opening a story in the detail pane is a stronger demand signal than
+  // scrolling it into view, and it generates strictly fewer: a rail scan costs nothing now.
   async function ensureSoWhat(it, line) {
     if (!it || !line || it.so_what || it._sw_loading) return
     it._sw_loading = true
@@ -3436,27 +3675,24 @@
 
   // Turn a news item into a theme thesis in the Theses feed (server mints a hypothesis-less,
   // model-free suggestion). On success, point the operator to where to dispose it.
-  async function newsToThesis(it, card, btn) {
+  async function newsToThesis(it, btn) {
     btn.disabled = true; const prev = btn.innerHTML; btn.textContent = "…"
     try {
       const r = await api("news_to_thesis", { event_id: it.event_id })
       markNewsSeen(it.event_id)   // Day 126 #3: turning into a thesis counts as seen
-      // Turned into a thesis → it's now in the Theses feed, so collapse the card to one
-      // line (feedback #2). Day 127: has_thesis now PERSISTS — v_news_review derives it
-      // from the news_to_thesis suggestion, so on reload the story stays collapsed with a
-      // "→ thesis" badge instead of re-surfacing untouched (the lost-signal / re-thesing
-      // bug). Set it locally too so the collapse is immediate this session.
+      // Day 127: has_thesis PERSISTS — v_news_review derives it from the news_to_thesis
+      // suggestion, so on reload the story still reads as actioned instead of re-surfacing
+      // untouched (the lost-signal / re-thesing bug). Set it locally so the rail marks it
+      // immediately, then repaint both panes from the mutated cache.
       it.has_thesis = true
-      if (card && card.parentNode) card.replaceWith(newsCardCollapsed(it))
-      else { btn.textContent = "✓ in Theses" }
+      renderNews(NEWS_CACHE)
       alert("Added to your Theses feed as a landscape sounding:\n\n“" + (r.claim || "") + "”\n\nOpen Theses to accept or reject it.")
     } catch (e) { btn.disabled = false; btn.innerHTML = prev; alert(e.message) }
   }
 
   // Analyze: a read-only panel of what this event already touches — the theses the
   // resonator generated from it (and who they're about) + its fit. No new guesses.
-  async function analyzeEvent(eventId, card) {
-    const slot = card.querySelector(".news-analyze")
+  async function analyzeEvent(eventId, slot) {
     if (slot.dataset.open === "1") { slot.innerHTML = ""; slot.style.margin = ""; slot.dataset.open = "0"; return }
     slot.dataset.open = "1"; slot.style.margin = "8px 0"; slot.innerHTML = '<p class="hint">analyzing…</p>'
     markNewsSeen(eventId)   // Day 126 #3: expanding/analyzing counts as seen
@@ -3478,6 +3714,15 @@
     }
     h += "</div>"
     slot.innerHTML = h
+    // Day 141: analysis answers "what does this already touch" — which is backward-looking.
+    // The operator's actual next question is "who does it concern that it hasn't touched
+    // yet". Ranked from the story's own text, so it works on a story with zero theses.
+    const it = NEWS_CACHE.find((x) => x.event_id === eventId)
+    if (it) {
+      const who = document.createElement("div"); slot.appendChild(who)
+      renderRelevantPeople(who, [it.title, it.summary].filter(Boolean).join(". "),
+        { title: "Who this could concern", limit: 8 })
+    }
   }
 
   function initNewsStateNav() {
@@ -3522,6 +3767,8 @@
   initNewsStateNav()
   initNewsSortNav()
   $("propRefresh").addEventListener("click", loadPropositions)
+  $("rel_btn").addEventListener("click", runRelevance)
+  $("rel_text").addEventListener("keydown", (e) => { if (e.key === "Enter") runRelevance() })
   $("p_createBtn").addEventListener("click", createProposition)
   $("composeClose").addEventListener("click", closeCompose)
   // Candidates load on first open of the picker, not on every visit to the tab — the op
