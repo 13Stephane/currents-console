@@ -2524,7 +2524,17 @@
     return wrap
   }
 
-  function taskCard(t) {
+  // The console's ONE task renderer (Day 141). It was two: this, and a cut-down `taskMini`
+  // sized to fit a now/next/later board cell. Retiring that board removed the only reason for
+  // the second one — and by then they had drifted, so a task inside a proposition said
+  // "done / drop" while the same task on the Tasks tab said "Complete / Abandon", and could
+  // not be re-filed or reworded at all without leaving the tab. Two renderers of one object
+  // stay in sync only by someone remembering; one cannot drift.
+  //
+  // opts.bulk === false suppresses the selection checkbox: bulk filing belongs to the Tasks
+  // tab's selection bar, and a checkbox with no bar to report to is a control that does nothing.
+  function taskCard(t, opts) {
+    const bulk = !opts || opts.bulk !== false
     const card = document.createElement("div"); card.className = "pending-card"
 
     const head = document.createElement("div"); head.className = "who"
@@ -2532,7 +2542,7 @@
     // non-terminal tasks only, matching the action row below: a completed task has nowhere to
     // be filed to that matters. Same mg-cb idiom as the merge composer so the console has one
     // multi-select pattern rather than two.
-    if (t.status === "open") {
+    if (bulk && t.status === "open") {
       const cb = document.createElement("input")
       cb.type = "checkbox"; cb.className = "mg-cb"; cb.value = t.id
       cb.style.cssText = "margin-right:8px;vertical-align:middle"
@@ -2780,7 +2790,9 @@
     if (!t) { host.innerHTML = '<p class="empty">—</p>'; return }
     const h = document.createElement("div"); h.className = "subject"; h.textContent = "floating task · no proposition"
     host.appendChild(h)
-    host.appendChild(taskCard(t))
+    // bulk:false for the same reason as the proposition list — the selection bar it reports to
+    // lives on the Tasks tab, so here the checkbox would tick and do nothing.
+    host.appendChild(taskCard(t, { bulk: false }))
   }
 
   function propSection(t) {
@@ -2929,7 +2941,10 @@
     const lane = PROP_SHOW_DONE ? p.tasks : liveTasks
     const hz = document.createElement("div")
     if (!lane.length) { const e = document.createElement("div"); e.className = "hint"; e.textContent = "— no live tasks"; hz.appendChild(e) }
-    for (const t of lane) hz.appendChild(taskMini(t))
+    // Same renderer as the Tasks tab, so a task reads and behaves identically wherever it is
+    // seen — including the proposition picker, which is how a task filed into the wrong
+    // workspace gets moved from the screen where you actually notice it.
+    for (const t of lane) hz.appendChild(taskCard(t, { bulk: false }))
     host.appendChild(hz)
     if (doneTasks.length) {
       const byStatus = {}
@@ -2995,26 +3010,6 @@
     return s
   }
 
-  function taskMini(t) {
-    const c = document.createElement("div"); c.style.cssText = "background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:8px 10px;margin-bottom:6px"
-    const a = document.createElement("div"); a.style.fontSize = "12.5px"; a.textContent = t.current_action; c.appendChild(a)
-    const pill = document.createElement("div"); pill.className = "hint"
-    pill.style.cssText = "margin-top:4px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap"
-    pill.innerHTML = '<span style="color:' + (TASK_STATUS_COLOR[t.status] || "var(--ink-dim)") + '">● ' + esc(t.status) + "</span>"
-    const chip = reviewChip(t); if (chip) pill.appendChild(chip)
-    c.appendChild(pill)
-    if (t.status === "open") {
-      // No longer draggable: the now/next/later columns it was dragged between are gone.
-      const acts = document.createElement("div"); acts.className = "acts"; acts.style.marginTop = "6px"
-      const b = (label, cls, fn) => { const x = mkBtn(label, cls + " mini", fn); x.style.marginTop = "0"; return x }
-      acts.appendChild(b("done", "btn-accept", () => taskAct(t.id, "completed")))
-      acts.appendChild(b("drop", "btn-reject", () => taskAct(t.id, "abandoned")))
-      acts.appendChild(b("still live", "btn-snooze", () => renewTask(t.id)))
-      c.appendChild(acts)
-    }
-    return c
-  }
-
   // "Still live" — the third answer the clock asks for. It resets review_at and increments
   // review_count, and it writes a chain-registered feedback_event, so a session that renews
   // owes audit_verify + an anchor at close, exactly as a disposal does.
@@ -3037,9 +3032,10 @@
     try { await api("update_proposition", { proposition_id: propId, status }); loadPropositions(); openProposition(propId) }
     catch (e) { alert(e.message) }
   }
-  async function taskAct(taskId, status) {
-    try { await api("update_task", { task_id: taskId, status, comment: "via console propositions tab" }); openProposition(PROP_OPEN) } catch (e) { alert(e.message) }
-  }
+  // taskAct removed Day 141 with taskMini, its only caller. It duplicated updateTaskStatus
+  // against the same update_task op, differing only in the refresh it triggered — and it
+  // called openProposition(PROP_OPEN), which is null whenever a floating task is selected.
+  // refreshAfterTaskChange repaints whichever tab is actually open, so one path serves both.
 
   function openAddStakeholder(p) {
     const wrap = $("addStakeWrap"); wrap.innerHTML = ""
