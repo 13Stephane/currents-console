@@ -29,7 +29,12 @@
   /* 672px = the old 720px wrap minus its 2×24px padding: the form/prose views keep
      the exact column width they had before the wrap was widened. Only the Theses
      split-reader (and, later, the Propositions split) uses the full width. */
-  #gatePanel, #tasksView { max-width: 672px; }
+  #gatePanel { max-width: 672px; }
+  /* Day 142: Do Next came off the 672px reading measure. It is not prose — it is a wide
+     row (subject marks · stream picker · review chip · four actions), and at 672px the
+     "show resolved" control was pushed out of the frame by its own heading. Its explainer
+     keeps a measure the way News and Streams do; only the list runs wide. */
+  #tasksView > .panel > .hint { max-width: 760px; }
   /* Find/add is two columns (Day 141), so it takes the full measure. Each column keeps a
      form-sized width of its own — a text input 550px wide reads as a mistake. */
   .add-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 26px; align-items: start; }
@@ -43,7 +48,17 @@
   @media (max-width: 940px) { .add-cols { grid-template-columns: 1fr; } }
   /* News and Propositions are two-pane readers, so their split runs the full width —
      but their explainer/filter panel is prose and keeps a reading measure. */
-  #newsView > .panel, #propositionsView > .panel { max-width: 760px; }
+  #propositionsView > .panel { max-width: 760px; }
+  /* Day 142: News keeps the reading measure on its PROSE only. The panel itself runs wide so
+     the state+sort row fits on one line — at 760px the seven controls wrapped, which put
+     "Newest" on a row of its own and made one set of filters read as two. */
+  #newsView > .panel { max-width: none; }
+  #newsView > .panel > .hint { max-width: 760px; }
+  #newsControls { flex-wrap: nowrap; overflow-x: auto; }
+  /* The rail meta is a single scan line and must stay one line. A long feed name truncates
+     rather than wrapping the score and state away from each other. */
+  .rmeta .src { display: inline-block; max-width: 190px; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
   .mono { font-family: "IBM Plex Mono", "SF Mono", ui-monospace, Menlo, monospace; }
   .head { display: flex; align-items: baseline; justify-content: space-between; gap: 18px;
     border-bottom: 1px solid var(--line); padding-bottom: 16px; margin-bottom: 28px; flex-wrap: wrap; }
@@ -260,12 +275,7 @@
   .grounding .prow { margin-bottom: 6px; font-size: 13px; color: var(--ink-dim); }
   .grounding .prow .side { color: var(--ink-faint); }
   .grounding .col-head .side { font-family: "IBM Plex Mono", monospace; font-size: 10px; color: var(--ink-faint); letter-spacing: 0; }
-  /* drag-and-drop the boards (Day 123 piece #2): a card grabs and moves between
-     columns; the <select> stays as the keyboard/a11y fallback. */
-  .dcard { cursor: grab; }
-  .dcard:active { cursor: grabbing; }
-  .dcard.dragging { opacity: .4; }
-  .dcol.drop-active { outline: 2px dashed var(--gold); outline-offset: -3px; background: rgba(198,165,83,.07) !important; }
+  /* .dcard / .dcol removed Day 142 with the last board (stakeholders). */
   .pint { border-left: 2px solid var(--line); padding-left: 11px; margin-bottom: 11px; }
   .pint .ihdr { font-family: "IBM Plex Mono", monospace; font-size: 10px; color: var(--ink-faint);
     letter-spacing: .04em; margin-bottom: 3px; }
@@ -345,7 +355,7 @@
       <button id="navNews">News</button>
       <button id="navDispose" class="active">Theses</button>
       <button id="navPropositions">Streams</button>
-      <button id="navTasks">Tasks</button>
+      <button id="navTasks">Do Next</button>
       <button id="navAdd" style="margin-left:auto">Find / add</button>
     </div>
 
@@ -537,7 +547,7 @@
       <div id="sugFilter" class="hidden"></div>
       <div class="split">
         <div class="col">
-          <div class="col-h">Pending <span id="sugCount"></span> <button class="ghost mini" id="dispRefresh" style="float:right;margin-top:-3px">refresh</button><label class="asset-filter" title="Show only proposals that name an asset to bring"><input type="checkbox" id="assetOnly"> ◈ asset-linked</label></div>
+          <div class="col-h">Pending <span id="sugCount"></span> <button class="ghost mini" id="dispRefresh" style="float:right;margin-top:-3px">refresh</button></div>
           <div class="rail" id="rail"></div>
         </div>
         <div class="col detail" id="detail">
@@ -555,14 +565,20 @@
 
     <div id="tasksView" class="hidden">
     <div class="panel">
-      <h2>Tasks <button class="ghost mini" id="tasksRefresh" style="margin-left:10px">refresh</button>
-        <label class="asset-filter" style="float:right" title="Include completed/abandoned"><input type="checkbox" id="tasksAll"> show resolved</label>
+      <!-- Day 142: "show resolved" moved onto the heading's own flex line rather than
+           floating out of it. A float:right control inside an h2 is positioned against the
+           heading box, so at the old 672px measure it left the frame. -->
+      <h2 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Do Next
+        <button class="ghost mini" id="tasksRefresh">refresh</button>
+        <label class="asset-filter" style="float:none;margin-left:auto" title="Include completed/abandoned"><input type="checkbox" id="tasksAll"> show resolved</label>
       </h2>
       <p class="hint">Your commitments — a task is spawned when you accept or edit a suggestion. <strong>Complete</strong> / <strong>Abandon</strong> is the outcome signal the loop grades against; <strong>Stall</strong> parks it. Unfiled tasks sit under <strong>Unassigned</strong>.</p>
       <div class="nav" id="taskSortNav" style="margin-bottom:12px;align-items:center">
         <span class="hint" style="margin:0 8px 0 0">order</span>
-        <button data-tsort="recent" class="active" title="Most recently updated first (grouped by proposition)">Recent</button>
-        <button data-tsort="donext" title="What to work on next: horizon (now → later), older work rising. One cross-proposition list.">Do next</button>
+        <button data-tsort="recent" class="active" title="Most recently updated first, grouped by stream">Recent</button>
+        <!-- Renamed from "Do next" Day 142: the tab now carries that name, and a sort option
+             sharing it read as a way to get back to the tab you were already on. -->
+        <button data-tsort="donext" title="One ranked list across every stream, oldest-pressing first">Ranked</button>
       </div>
       <!-- Day 139 · bulk filing bar (docs/spec_bulk_task_filing_2026-08-09.md). Hidden until
            at least one task is ticked. No confirm dialog: filing is curation and reversible in
@@ -583,18 +599,27 @@
     <div id="newsView" class="hidden">
     <div class="panel">
       <h2>News</h2>
-      <p class="hint">The news-fit <strong>gate</strong> — the precision filter that runs <em>before</em> the resonator turns a story into theses, so nothing here writes a calibration signal (model proposes, you dispose). <strong>Eligible</strong> = flowing (the default). <strong>Parked</strong> = low-fit set-aside: the system parks these <em>automatically</em>, they <em>expire</em> from view after 14 days and train the scorer (also where <strong>Park</strong> mutes one yourself). <strong>Held</strong> = <em>your</em> manual shelf: never auto-set, never expires, kept to revisit. <strong>Validate</strong> promotes a parked/held story back into flow. Per item you can <strong>turn it into a thesis</strong> (a landscape sounding for your Theses feed) or <strong>analyze</strong> what it already touches. <span style="color:var(--ink-faint)">— vs the <strong>Theses</strong> feed, where disposing <em>does</em> write calibration: that's the ground truth, this is the gate.</span></p>
-      <div class="nav" id="newsStateNav" style="margin-bottom:10px">
-        <button data-state="eligible" class="active">Eligible</button>
-        <button data-state="held">Held</button>
-        <button data-state="parked">Parked</button>
-        <button data-state="all">All</button>
-      </div>
-      <div class="nav" id="newsSortNav" style="margin-bottom:14px;align-items:center">
-        <span class="hint" style="margin:0 8px 0 0">sort</span>
-        <button data-sort="balanced" class="active" title="Fit × freshness — most relevant from recent days">Balanced</button>
-        <button data-sort="relevance" title="Pure fit score, ignores age">Relevance</button>
-        <button data-sort="newest" title="Most recently observed first">Newest</button>
+      <!-- Day 142: the tag glossary moved OFF the top of the tab and into the rail footer.
+           It was ~90 words of definition standing between the operator and the list every
+           single visit, which is the wrong ratio for something you read once and then know.
+           One line of what-this-is stays; the definitions sit under the headlines, where
+           they are reachable at the moment a tag is actually in front of you. -->
+      <p class="hint">The news-fit <strong>gate</strong> — the precision filter that runs <em>before</em> the resonator turns a story into theses, so nothing here writes a calibration signal. <span style="color:var(--ink-faint)">The <strong>Theses</strong> feed is where disposing <em>does</em> write calibration: that's the ground truth, this is the gate. Tags are explained under the list.</span></p>
+      <!-- Day 142: state and sort on ONE row. They were two stacked navs, which read as two
+           levels of filtering when they are one list changed two ways. -->
+      <div class="nav" id="newsControls" style="margin-bottom:4px;align-items:center;gap:8px">
+        <span id="newsStateNav" style="display:contents">
+          <button data-state="eligible" class="active">Eligible</button>
+          <button data-state="held">Held</button>
+          <button data-state="parked">Parked</button>
+          <button data-state="all">All</button>
+        </span>
+        <span class="hint" style="margin:0 4px 0 10px;border-left:1px solid var(--line);padding-left:14px">sort</span>
+        <span id="newsSortNav" style="display:contents">
+          <button data-sort="balanced" class="active" title="Fit × freshness — most relevant from recent days">Balanced</button>
+          <button data-sort="relevance" title="Pure fit score, ignores age">Relevance</button>
+          <button data-sort="newest" title="Most recently observed first">Newest</button>
+        </span>
       </div>
     </div>
     <!-- Two-pane reader (Day 141): headlines scan on the left, everything that asks for a
@@ -1591,12 +1616,16 @@
   function renderRail() {
     renderReviewBanner()
     renderSugFilter()
-    const assetOnly = $("assetOnly") && $("assetOnly").checked
-    const view = assetOnly ? SUGS.filter((s) => s.asset) : SUGS
-    $("sugCount").textContent = assetOnly ? "· " + view.length + " / " + SUGS.length : "· " + SUGS.length
+    // Day 142: the ◈ asset-linked filter is gone. `assets` is 0 rows with no producer beyond
+    // the Day-98 add_asset op, so the checkbox filtered a live feed down to nothing and read
+    // as a broken filter rather than an empty library. Its layer is also still unresolved
+    // (CLAUDE.md: neither spine nor soft), so a filter keyed on it was asserting a
+    // classification the estate has not made.
+    const view = SUGS
+    $("sugCount").textContent = "· " + SUGS.length
     const host = $("rail")
     host.innerHTML = ""
-    if (!view.length) { host.innerHTML = '<p class="empty">' + (assetOnly ? "No asset-linked proposals pending." : "Nothing pending. The feed is clear.") + '</p>'; return }
+    if (!view.length) { host.innerHTML = '<p class="empty">Nothing pending. The feed is clear.</p>'; return }
     // Day 91: group cross-subject near-duplicates by cluster_key (person + org of
     // the same event, joined by a current affiliation). A cluster of ≥2 collapses
     // under one header; click to expand. Singletons render as before. Server order
@@ -2600,11 +2629,15 @@
     // is now "Still live", which moves the review date instead of setting a state.
     if (t.status === "open") {
       const acts = document.createElement("div"); acts.className = "acts"
-      acts.appendChild(mkBtn("Complete", "btn-accept", () => updateTaskStatus(t.id, "completed")))
-      acts.appendChild(mkBtn("Abandon", "btn-reject", () => updateTaskStatus(t.id, "abandoned")))
-      acts.appendChild(mkBtn("Still live", "btn-snooze", () => renewTask(t.id)))
-      acts.appendChild(mkBtn("Edit action", "btn-edit", () => openTaskEdit(card, t)))
-      acts.appendChild(mkBtn("✧ Reframe", "btn-edit", () => {
+      // Day 142: `mini` on every one, matching the Streams tab. These were full-size
+      // buttons, so a task card was mostly chrome — six controls at reading size under a
+      // one-line action. Same class, same padding, one button scale across both tabs.
+      const tmini = (label, cls, fn) => { const b = mkBtn(label, cls + " mini", fn); b.style.marginTop = "0"; return b }
+      acts.appendChild(tmini("Complete", "btn-accept", () => updateTaskStatus(t.id, "completed")))
+      acts.appendChild(tmini("Abandon", "btn-reject", () => updateTaskStatus(t.id, "abandoned")))
+      acts.appendChild(tmini("Still live", "btn-snooze", () => renewTask(t.id)))
+      acts.appendChild(tmini("Edit action", "btn-edit", () => openTaskEdit(card, t)))
+      acts.appendChild(tmini("✧ Reframe", "btn-edit", () => {
         let slot = card.querySelector(".reframe-slot")
         if (!slot) { slot = document.createElement("div"); slot.className = "reframe-slot inline-edit"; card.appendChild(slot) }
         openReframe("task", t.id, t.current_action, slot, async (text) => { await api("update_task", { task_id: t.id, current_action: text }); refreshAfterTaskChange() })
@@ -2827,47 +2860,10 @@
     d.style.cssText = "text-transform:uppercase;letter-spacing:.12em;color:var(--ink-faint);margin:18px 0 8px;border-bottom:1px solid var(--line);padding-bottom:4px"
     d.textContent = t; return d
   }
-  function propColumn(headText, headColor) {
-    const col = document.createElement("div")
-    col.style.cssText = "flex:1;min-width:150px;background:rgba(255,255,255,.02);border:1px solid var(--line);border-radius:6px;padding:8px"
-    const h = document.createElement("div"); h.className = "hint"
-    h.style.cssText = "text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px" + (headColor ? ";color:" + headColor : "")
-    h.textContent = headText; col.appendChild(h); return col
-  }
-
-  // Drag-and-drop the boards (Day 123 piece #2). The moved item's identity rides a
-  // module var (dataTransfer is unreliable across browsers and absent in headless
-  // renders); dataTransfer is still set so the browser permits the drop. A same-column
-  // drop is a no-op (no write). The <select> stays as the keyboard/a11y fallback — and
-  // is the only path to declined/dropped, which have no board column.
-  let DRAG = null
-  function makeDraggable(card, kind, id, from) {
-    card.classList.add("dcard"); card.draggable = true; card.title = "drag to move"
-    card.addEventListener("dragstart", (e) => {
-      DRAG = { kind, id, from }; card.classList.add("dragging")
-      if (e.dataTransfer) { e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/plain", String(id)) } catch (_) {} }
-    })
-    card.addEventListener("dragend", () => {
-      card.classList.remove("dragging"); DRAG = null
-      document.querySelectorAll(".dcol.drop-active").forEach((el) => el.classList.remove("drop-active"))
-    })
-  }
-  function makeDropTarget(col, kind, to, onDrop) {
-    col.classList.add("dcol")
-    col.addEventListener("dragover", (e) => {
-      if (!DRAG || DRAG.kind !== kind) return
-      e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = "move"; col.classList.add("drop-active")
-    })
-    col.addEventListener("dragleave", (e) => { if (!col.contains(e.relatedTarget)) col.classList.remove("drop-active") })
-    col.addEventListener("drop", (e) => {
-      col.classList.remove("drop-active")
-      if (!DRAG || DRAG.kind !== kind) return
-      e.preventDefault()
-      const d = DRAG; DRAG = null
-      if (d.from === to) return   // dropped back in its own column — no write
-      onDrop(d.id, to)
-    })
-  }
+  // propColumn / makeDraggable / makeDropTarget retired Day 142 with the stakeholder board,
+  // their only remaining caller — the now/next/later task board had already gone on Day 141.
+  // Drag was the third way to set a stage beside the column and the select, and it was the
+  // one that could not reach declined or dropped. One clickable tag replaces all three.
 
   function renderPropDetail(p) {
     const host = $("propDetail"); host.innerHTML = ""
@@ -2941,21 +2937,26 @@
     }
     host.appendChild(life); host.appendChild(lnSlot)
 
-    // stakeholder board
-    host.appendChild(propSection("Stakeholders · by engagement stage"))
-    const board = document.createElement("div"); board.style.cssText = "display:flex;gap:10px;flex-wrap:wrap"
-    for (const stage of ["considering", "latent", "active", "committed"]) {
-      const col = propColumn(STAGE_LABEL[stage], STAGE_COLOR[stage])
-      makeDropTarget(col, "stakeholder", stage, (personId, to) => setStage(p.id, personId, to))
-      for (const s of p.stakeholders.filter((x) => x.stage === stage)) col.appendChild(stakeholderCard(p, s))
-      board.appendChild(col)
+    // Stakeholders — ONE list, stage carried as a clickable tag (Day 142).
+    //
+    // Was a four-column board plus a <select> per card plus a drag handler, which is three
+    // controls for one act. The board also could not show `declined`/`dropped` at all: they
+    // had no column, so they were exiled to a comma-joined "inactive:" line and the select
+    // was the only path to them. One list with every stage on it removes that asymmetry —
+    // there is now no stage the operator can reach one way and not another.
+    //
+    // Sorted by engagement, hottest first, so the list reads as a funnel rather than as
+    // insertion order.
+    host.appendChild(propSection("Stakeholders · " + p.stakeholders.length))
+    if (!p.stakeholders.length) {
+      const e = document.createElement("p"); e.className = "hint"
+      e.textContent = "No one on this stream yet. Add a stakeholder, or fold a thesis in — its subject attaches automatically."
+      host.appendChild(e)
     }
-    host.appendChild(board)
-    const inactive = p.stakeholders.filter((x) => x.stage === "declined" || x.stage === "dropped")
-    if (inactive.length) {
-      const inh = document.createElement("div"); inh.className = "hint"; inh.style.marginTop = "8px"
-      inh.textContent = "inactive: " + inactive.map((x) => x.name + " (" + x.stage + ")").join(", "); host.appendChild(inh)
-    }
+    const order = ["committed", "active", "considering", "latent", "declined", "dropped"]
+    const ranked = p.stakeholders.slice().sort((a, b) =>
+      order.indexOf(a.stage) - order.indexOf(b.stage) || (a.name || "").localeCompare(b.name || ""))
+    for (const s of ranked) host.appendChild(stakeholderRow(p, s))
     const addWrap = document.createElement("div"); addWrap.id = "addStakeWrap"; addWrap.style.marginTop = "10px"
     addWrap.appendChild(mkBtn("+ add stakeholder", "btn-edit", () => openAddStakeholder(p))); host.appendChild(addWrap)
 
@@ -3031,19 +3032,43 @@
     }
   }
 
-  function stakeholderCard(p, s) {
-    const c = document.createElement("div"); c.style.cssText = "background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:6px 8px;margin-bottom:6px"
-    // Drag to advance the stage (piece #2); the select below stays as the fallback.
-    makeDraggable(c, "stakeholder", s.person_id, s.stage)
-    const nm = document.createElement("div"); nm.style.cssText = "font-size:13px;font-weight:600"; nm.textContent = s.name; c.appendChild(nm)
-    if (s.role) { const r = document.createElement("div"); r.className = "hint"; r.style.textTransform = "uppercase"; r.textContent = s.role.replace(/_/g, " "); c.appendChild(r) }
-    const sel = document.createElement("select"); sel.style.cssText = "margin-top:5px;font-size:12px;padding:3px 5px;width:100%"
-    for (const st of STAGES) { const o = document.createElement("option"); o.value = st; o.textContent = STAGE_LABEL[st]; if (st === s.stage) o.selected = true; sel.appendChild(o) }
-    sel.addEventListener("change", () => setStage(p.id, s.person_id, sel.value))
-    c.appendChild(sel)
+  // One stakeholder, one row. Every stage is present as a tag; the current one is filled and
+  // the rest are outlines, so the row states where the person is AND what the alternatives
+  // are in the same glance. Clicking a tag writes that stage — one click, no intermediate
+  // control. The current tag is inert rather than hidden: a stage list that reflows as you
+  // click it makes the next target move under the cursor.
+  function stakeholderRow(p, s) {
+    const row = document.createElement("div")
+    row.style.cssText = "display:flex;gap:10px;align-items:center;flex-wrap:wrap;"
+      + "padding:7px 0;border-bottom:1px solid var(--line)"
+
+    const nm = document.createElement("div"); nm.style.cssText = "font-size:13.5px;min-width:0"
+    nm.innerHTML = markSpan("person", "mk-person") + " " + esc(s.name || "(person)")
+      + (s.role ? ' <span class="side" style="text-transform:uppercase">' + esc(s.role.replace(/_/g, " ")) + "</span>" : "")
+    row.appendChild(nm)
+
+    const tags = document.createElement("div")
+    tags.style.cssText = "display:flex;gap:4px;flex-wrap:wrap;margin-left:auto"
+    for (const st of STAGES) {
+      const on = st === s.stage
+      const col = STAGE_COLOR[st]
+      const tag = document.createElement("button")
+      tag.textContent = STAGE_LABEL[st]
+      tag.style.cssText = "font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.08em;"
+        + "text-transform:uppercase;padding:2px 8px;border-radius:10px;margin:0;"
+        + "border:1px solid " + col + ";"
+        + (on ? "background:" + col + ";color:var(--bg);cursor:default"
+              : "background:transparent;color:var(--ink-faint);cursor:pointer")
+      tag.title = on ? "Current stage" : "Set stage to " + STAGE_LABEL[st]
+      if (on) tag.disabled = true
+      else tag.onclick = () => setStage(p.id, s.person_id, st)
+      tags.appendChild(tag)
+    }
+    row.appendChild(tags)
+
     const cb = mkBtn("✉ compose", "btn-edit", () => openCompose(s.person_id, s.name, p.id))
-    cb.style.cssText = "margin-top:5px;font-size:11px;padding:4px 8px"; c.appendChild(cb)
-    return c
+    cb.style.cssText = "font-size:11px;padding:4px 8px;margin:0"; row.appendChild(cb)
+    return row
   }
 
   // The review clock (Day 141), rendered the same way everywhere it appears. A task past its
@@ -3065,7 +3090,7 @@
   function paintDueBadge(tasks) {
     if (tasks) DUE_COUNT = tasks.filter(isDue).length
     const btn = $("navTasks"); if (!btn) return
-    btn.textContent = "Tasks"
+    btn.textContent = "Do Next"
     if (!DUE_COUNT) return
     const b = document.createElement("span")
     b.style.cssText = "margin-left:7px;font-weight:600;color:"
@@ -3786,11 +3811,34 @@
     parked: "Low-fit set-aside — auto-parked by the scorer or muted by you; expires from view after 14 days and trains the scorer."
   }
 
+  // Day 142 — News was the last list in the console still defaulting to the archive. Every
+  // other surface shows what is live and lets you opt into the rest: Do Next shows open,
+  // Streams hide dropped, stream boards collapse retired. News showed 84 stories back to the
+  // 21-day TTL, which is a fortnight of already-decided gate.
+  //
+  // Two separate bounds, deliberately not one:
+  //   * NEWS_WINDOW_DAYS is a claim about relevance — a five-day-old story usually is not
+  //     news any more. It is sent to the server, which clamps it to the TTL.
+  //   * NEWS_LIMIT is a claim about attention — a rail you can actually scan. It is applied
+  //     client-side, AFTER sorting, so the cap always keeps the top 30 by the chosen sort
+  //     rather than an arbitrary 30 the server happened to return.
+  // Collapsing them into one number would mean widening the window silently lengthened the
+  // list, and capping the list silently narrowed the window.
+  let NEWS_WINDOW_DAYS = 7
+  const NEWS_TTL_DAYS = 21
+  const NEWS_LIMIT = 30
+  let NEWS_TOTAL = 0        // how many the window actually held, before the cap
+
   async function loadNews() {
     const host = $("newsRail"); host.innerHTML = '<p class="empty">loading…</p>'
     try {
-      const r = await api("list_news", { state: NEWS_STATE, sort: NEWS_SORT, limit: 100 })
-      renderNews(r.news || [])
+      const r = await api("list_news", {
+        state: NEWS_STATE, sort: NEWS_SORT, limit: 200,
+        max_age_days: NEWS_WINDOW_DAYS,
+      })
+      const all = r.news || []
+      NEWS_TOTAL = all.length
+      renderNews(all.slice(0, NEWS_LIMIT))
     } catch (e) { host.textContent = e.message }
   }
 
@@ -3807,10 +3855,65 @@
       $("newsDetail").innerHTML = '<p class="empty">—</p>'; NEWS_SEL = null; return
     }
     for (const it of items) host.appendChild(newsRailItem(it))
+    host.appendChild(newsRailFooter(items.length))
     // Hold the open story across a refresh where it survives the filter; otherwise open
     // the top of the list, so the pane is never empty next to a populated rail.
     const keep = NEWS_SEL && items.some((x) => x.event_id === NEWS_SEL)
     selectNews(keep ? NEWS_SEL : items[0].event_id)
+  }
+
+  // The foot of the rail carries the two things that belong AFTER the list rather than
+  // before it: what was left out, and what the tags mean. Both are answers to questions you
+  // only have once you have looked at the list.
+  function newsRailFooter(shown) {
+    const f = document.createElement("div")
+    f.style.cssText = "padding:14px 16px 22px;border-top:1px solid var(--line);margin-top:10px"
+
+    // What the window and the cap left out — stated separately, because they are different
+    // exclusions and "show more" would otherwise be ambiguous about which one it relaxes.
+    const capped = NEWS_TOTAL > shown
+    if (NEWS_STATE === "eligible" || NEWS_STATE === "validated") {
+      const line = document.createElement("p"); line.className = "hint"; line.style.margin = "0 0 10px"
+      line.textContent = capped
+        ? "Showing the top " + shown + " of " + NEWS_TOTAL + " from the last " + NEWS_WINDOW_DAYS + " days."
+        : "Showing all " + shown + " from the last " + NEWS_WINDOW_DAYS + " days."
+      f.appendChild(line)
+      const esc2 = document.createElement("button")
+      esc2.className = "ghost mini"; esc2.style.marginTop = "0"
+      const wide = NEWS_WINDOW_DAYS >= NEWS_TTL_DAYS
+      esc2.textContent = wide ? "back to the last 7 days" : "widen to the full " + NEWS_TTL_DAYS + " days"
+      esc2.title = wide
+        ? "Return to the freshness default"
+        : "The full gate back to the scorer's " + NEWS_TTL_DAYS + "-day expiry"
+      esc2.onclick = () => { NEWS_WINDOW_DAYS = wide ? 7 : NEWS_TTL_DAYS; loadNews() }
+      f.appendChild(esc2)
+    } else if (capped) {
+      const line = document.createElement("p"); line.className = "hint"; line.style.margin = "0 0 10px"
+      line.textContent = "Showing the top " + shown + " of " + NEWS_TOTAL + "."
+      f.appendChild(line)
+    }
+
+    // The glossary, moved down from the tab header (Day 142). Same four states the rail
+    // colour-codes, defined next to where the colours are actually seen.
+    const gl = document.createElement("div")
+    gl.style.cssText = "margin-top:16px;padding-top:12px;border-top:1px solid var(--line)"
+    let h = '<p class="hint" style="margin:0 0 8px;text-transform:uppercase;letter-spacing:.12em;font-size:9.5px">what the tags mean</p>'
+    const DEFS = [
+      ["eligible", "Flowing to the resonator. The default, and the only state that mints theses."],
+      ["held", "Your manual shelf. Never auto-set, never expires — kept to revisit."],
+      ["parked", "Low-fit set-aside: auto-parked by the scorer, or muted by you. Expires from view after 14 days and trains the scorer."],
+      ["validated", "You promoted a parked or held story back into flow."],
+    ]
+    for (const [k, v] of DEFS) {
+      h += '<p class="hint" style="margin:0 0 5px;line-height:1.5">'
+        + '<span style="color:' + (NEWS_STATE_COLOR[k] || "var(--ink-dim)") + '">' + k + "</span> — " + esc(v) + "</p>"
+    }
+    h += '<p class="hint" style="margin:8px 0 0;color:var(--ink-faint);line-height:1.5">'
+      + "The number beside each headline is its fit score. <strong>Validate</strong> promotes a story back into flow; "
+      + "<strong>thesis</strong> turns one into a landscape sounding in your Theses feed; <strong>Analyze</strong> reads what it already touches.</p>"
+    gl.innerHTML = h
+    f.appendChild(gl)
+    return f
   }
 
   // Day 126 (feedback #2) / Day 127, carried into the rail: a story that already produced
@@ -3831,6 +3934,11 @@
     m.innerHTML = '<span style="font-variant-numeric:tabular-nums">'
       + (it.fit_score == null ? "—" : Number(it.fit_score).toFixed(3)) + "</span>"
       + ' <span style="color:' + col + '">' + esc(it.fit_state || "") + "</span>"
+      // Day 142: provenance on the scan line too. "Always show provenance" is not satisfied by
+      // putting it only in the detail pane — the rail is where you decide what to open, and
+      // which feed filed a story is part of that judgement.
+      + ' <span class="src" style="color:var(--ink-faint)" title="' + esc(it.source_label || "unattributed") + '">'
+        + esc(it.source_label || "unattributed") + "</span>"
       + (newsActioned(it)
         ? ' <span style="color:var(--green)">' + (it.has_thesis ? "→ thesis" : it.hypothesis_count + " theses") + "</span>"
         : "")
@@ -3847,9 +3955,16 @@
     const d = $("newsDetail"); d.innerHTML = ""
     if (!it) { d.innerHTML = '<p class="empty">—</p>'; return }
 
+    // Provenance, always, and honest when it is absent (Day 142). This line used to read
+    // `it.source_kind || "news"` — and source_kind was NULL on all 2739 rows, so it printed
+    // the constant "news" forever. Every pre-Day-142 story genuinely has no recoverable
+    // source, so it says `unattributed` rather than guessing: the article host would name
+    // the wrong thing for every Hacker News item, which is most of the long tail.
     const head = document.createElement("div"); head.className = "subject"
-    head.textContent = [(it.source_kind || "news"), (it.observed_at || "").slice(0, 10),
+    const src = it.source_label || "unattributed"
+    head.textContent = [src, (it.observed_at || "").slice(0, 10),
       (it.fit_score == null ? null : "fit " + Number(it.fit_score).toFixed(3))].filter(Boolean).join(" · ")
+    if (src === "unattributed") head.title = "Ingested before provenance was recorded (2026-08-11). The source cannot be recovered."
     d.appendChild(head)
 
     const st = document.createElement("span"); st.textContent = it.fit_state
@@ -3943,7 +4058,22 @@
       // immediately, then repaint both panes from the mutated cache.
       it.has_thesis = true
       renderNews(NEWS_CACHE)
-      alert("Added to your Theses feed as a landscape sounding:\n\n“" + (r.claim || "") + "”\n\nOpen Theses to accept or reject it.")
+      // Day 142: was an alert(). A modal for a successful, reversible, one-click act trains
+      // the operator to dismiss modals without reading them — and this one interrupted to
+      // report a success the rail already shows ("→ thesis", the row dimming). The claim it
+      // carried is the one part worth keeping, so it lands in the detail pane instead, where
+      // it can be read at leisure and does not have to be acknowledged.
+      const d = $("newsDetail")
+      if (d && NEWS_SEL === it.event_id) {
+        const note = document.createElement("div")
+        note.style.cssText = "margin-top:12px;padding:9px 12px;border-left:2px solid var(--green);"
+          + "background:rgba(255,255,255,.02);font-size:13px;line-height:1.5;color:var(--ink-dim)"
+        note.innerHTML = '<span style="color:var(--green)">Added to your Theses feed</span>'
+          + (r.claim ? '<div style="font-style:italic;margin-top:4px">“' + esc(r.claim) + "”</div>" : "")
+          + ' <a href="#" style="color:var(--gold)">open Theses to dispose it →</a>'
+        note.querySelector("a").onclick = (e) => { e.preventDefault(); showDispose() }
+        d.appendChild(note)
+      }
     } catch (e) { btn.disabled = false; btn.innerHTML = prev; alert(e.message) }
   }
 
@@ -4054,7 +4184,6 @@
     $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); runFinder({}) } })
   }
   $("dispRefresh").addEventListener("click", loadSuggestions)
-  $("assetOnly").addEventListener("change", renderRail)
   $("profileClose").addEventListener("click", closeProfile)
   $("profileModal").addEventListener("click", (e) => { if (e.target === $("profileModal")) closeProfile() })
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("profileModal").classList.contains("show")) closeProfile() })
