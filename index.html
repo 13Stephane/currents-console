@@ -66,6 +66,10 @@
   h1 em { font-style: italic; color: var(--gold); font-weight: 400; }
   .sub { font-family: "IBM Plex Mono", monospace; font-size: 10.5px; letter-spacing: .16em;
     text-transform: uppercase; color: var(--ink-faint); }
+  /* Day 143 — which build you are looking at, so "did it ship?" is answerable from the page
+     instead of from curl. Quieter than the motto beside it: this is metadata, not a claim. */
+  .build { display: block; margin-top: 4px; font-size: 9px; letter-spacing: .1em;
+    color: rgba(244,240,233,.22); text-transform: none; }
   .panel { border: 1px solid var(--line); border-radius: 3px; padding: 24px 26px;
     margin-bottom: 18px; background: rgba(244,240,233,.02); }
   .panel h2 { font-size: 18px; font-weight: 400; margin: 0 0 16px; letter-spacing: .01em; }
@@ -203,7 +207,14 @@
   .chip.amber .dot { background: var(--gold); }
   .chip.green .dot { background: var(--green); }
   .chip .state { color: var(--ink-dim); }
-  .chip .arr { letter-spacing: 2px; color: var(--ink); }
+  /* The natural-frequency array (Day 143): ten dots, `filled` of them solid. Replaces ◆◇,
+     which shared a notation with the thesis mark. Sized off the chip's own dot so the two
+     confidence signals on a chip read as one family. */
+  .chip .arr { display: inline-flex; align-items: center; gap: 2.5px; }
+  .chip .arr .fq { width: 5px; height: 5px; border-radius: 50%; display: inline-block;
+    border: 1px solid currentColor; opacity: .55; }
+  .chip .arr .fq.on { background: currentColor; opacity: 1; }
+  .chip.mini-chip .arr .fq { width: 4px; height: 4px; }
   .chip .qual { color: var(--ink-dim); text-transform: none; letter-spacing: .02em; font-style: italic; }
   .chip.mini-chip { font-size: 8.5px; gap: 6px; }
   .chip.mini-chip .dot { width: 6px; height: 6px; }
@@ -407,7 +418,17 @@
 <div class="wrap">
   <div class="head">
     <h1><svg class="head-mark"><use href="#g-sounding"/></svg>Currents · the <em>operator</em> console</h1>
-    <span class="sub">system proposes · human disposes</span>
+    <span class="sub">system proposes · human disposes
+      <!-- Day 143 · build stamp. The text inside the span below is a token that
+           scripts/mirror_console.sh replaces with the source commit at publish time, and the
+           script FAILS if it cannot find it. So this file, opened off disk, always says it is
+           not a build; the published copy always names the commit it came from. Never edit that
+           string by hand — the point is that it cannot be typed, only derived.
+           This comment deliberately does NOT repeat the token: the script's first real run
+           replaced it here as well as below, and its own 2-line guard caught the double
+           substitution. Any second copy of that literal in this file breaks publishing. -->
+      <span class="build">build 6f2b51c+dirty · 2026-08-11</span>
+    </span>
   </div>
 
   <div class="panel" id="gatePanel">
@@ -607,6 +628,39 @@
       <div id="library" style="margin-top:10px"></div>
     </div>
 
+    <!-- Day 143 · the write half of the sweep list. Sits in the "record into the spine" column
+         because it is the one form here that decides what raw material arrives at all: every
+         other panel records something you already know, this one opens a tap. Read + the
+         on/off toggle live on News under "sources"; adding belongs where adding lives. -->
+    <div class="panel">
+      <h2>Add a news source<a class="fnmark" href="#fn-add-9">9</a></h2>
+      <div class="row">
+        <div><label>Kind</label>
+          <select id="f_kind">
+            <option value="rss">rss — swept every 4h</option>
+            <option value="email">email — not swept yet</option>
+            <option value="html">html — not swept yet</option>
+          </select>
+        </div>
+      </div>
+      <!-- Shown for email/html only. rss-adapter reads kind='rss' and nothing else (verified
+           live), so those two kinds store a row that no job will ever look at. Saying so at
+           the form beats saying so in a footnote nobody opens before submitting. -->
+      <p class="hint hidden" id="f_inert" style="color:var(--gold);margin-top:8px">
+        Nothing sweeps this kind yet. The subscription will be stored and stay inert until an adapter for it exists.
+      </p>
+      <label>Feed URL *</label>
+      <input id="f_ref" placeholder="https://example.com/feed/" autocomplete="off">
+      <label>Label *</label>
+      <input id="f_label" placeholder="What the News tab should call it, e.g. Import AI">
+      <div class="row">
+        <div><label>Sectors (comma-separated)</label><input id="f_sectors" placeholder="technology, AI"></div>
+        <div><label>Topics (comma-separated)</label><input id="f_topics" placeholder="AI, research, policy"></div>
+      </div>
+      <button id="addFeedBtn" class="mini standoff">Add source</button>
+      <div class="out" id="f_out"></div>
+    </div>
+
       </div>
     </div>
     <!-- Day 143 · footnotes. Eight explainers came off eight panel headings; the text is
@@ -623,6 +677,7 @@
         <li id="fn-add-6"><strong>Log a note.</strong> Raw signal into person_raw_inputs — the fuel person-listener extracts from. Search for the person, or it auto-fills after an add.</li>
         <li id="fn-add-7"><strong>Add asset.</strong> Your own content — value props, writings, talks. The resonator scores these against world-events; outreach-composer cites them. Not derived from the spine — this is the only way to seed them.</li>
         <li id="fn-add-8"><strong>Asset library.</strong> Your seeded assets, ordered by the resonator's live relevance score. Click “edit” to revise one (re-embeds on save when title/summary/body change).</li>
+        <li id="fn-add-9"><strong>Add a news source.</strong> The daily sweep list. A source added here is fetched by <em>rss-adapter</em> every four hours, and every story it files carries its name through the News tab and into per-source performance. <strong>Sectors and topics</strong> are stamped on every story the feed produces, so they are how it gets found later, not decoration. Only <em>rss</em> is swept today. There is no delete: switching a source off on the News tab keeps its past stories attributable, which deleting it would not.</li>
       </ol>
     </div>
     </div><!-- /addView -->
@@ -1545,7 +1600,7 @@
     const inv = p.involvements || [], tsk = p.tasks || []
     if (inv.length || tsk.length) {
       h += '<div class="psec"><h3>Involved in</h3>'
-      for (const v of inv) h += '<div class="prow">' + markSpan("inf_hollow", "mk-inf") + " " + esc(v.proposition || "(proposition)") +
+      for (const v of inv) h += '<div class="prow">' + markSpan("stream", "mk-inf") + " " + esc(v.proposition || "(proposition)") +
         ' <span class="side">' + esc([v.role, v.stage].filter(Boolean).join(" · ")) + "</span></div>"
       for (const t of tsk) h += '<div class="prow"><span class="mk" style="color:var(--gold)">●</span> ' + esc(t.action) +
         ' <span class="side">' + esc([t.status, t.horizon, t.proposition].filter(Boolean).join(" · ")) + "</span></div>"
@@ -1559,7 +1614,7 @@
       h += '<div class="psec"><h3>Connections</h3>'
       for (const c of (conn.confirmed || [])) h += '<div class="prow">' + markSpan("person", "mk-person") + " " + esc(c.name || "(person)") +
         ' <span class="side">' + esc(c.kind || "relation") + (c.confirmed ? " · confirmed" : "") + "</span></div>"
-      for (const c of (conn.inferred || [])) h += '<div class="prow">' + markSpan("inf_hollow", "mk-inf") + " " + esc(c.name || "(person)") +
+      for (const c of (conn.inferred || [])) h += '<div class="prow">' + markSpan("thesis", "mk-work") + " " + esc(c.name || "(person)") +
         ' <span class="side">thesis' + (c.why ? " · " + esc(c.why) : "") + "</span></div>"
       h += "</div>"
     }
@@ -1726,10 +1781,17 @@
     const title = c.n_resolved < 5
       ? "first surfacings of this type — no calibration history yet"
       : "based on " + c.n_resolved + " surfacings of this type"
+    // Day 143 · the natural-frequency array is DOTS, not ◆◇.
+    //
+    // D-00X moves calibration off the diamond entirely: shape now carries what an object is
+    // and its commitment state, and confidence is its own channel. Filled/hollow diamonds
+    // here were the same notation the console used for a thesis mark, so one glyph meant two
+    // unrelated things on the same screen. Display-only — the grey/amber/green thresholds
+    // (n>=5, n>=16) are untouched, and the raw number is still never shown.
     let arr = ""
     if (c.state !== "grey") {
       let s = ""
-      for (let i = 0; i < 10; i++) s += i < c.filled ? "◆" : "◇"
+      for (let i = 0; i < 10; i++) s += '<i class="fq' + (i < c.filled ? " on" : "") + '"></i>'
       arr = '<span class="arr">' + s + "</span>"
     }
     const qual = c.qualifier ? '<span class="qual">' + c.qualifier + " confirmed</span>" : ""
@@ -1785,7 +1847,10 @@
     el.style.cssText = "margin-bottom:12px;padding:8px 12px;border:1px solid var(--gold);border-radius:6px;font-size:13px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"
     el.innerHTML = ""
     const label = document.createElement("span"); label.style.color = "var(--ink-dim)"
-    label.innerHTML = '<span style="color:var(--gold)">◆ initiative</span> ' + esc(SUG_TRIGGER_TITLE || "(initiative)") + ' — showing only its theses'
+    // The diamond is now the trigger family's alone, and an initiative IS a `triggers` row —
+    // so this, the console's one accidentally-correct diamond, becomes its only one.
+    label.innerHTML = '<span style="color:var(--gold)">' + markSpan("initiative", "mk-inf")
+      + " initiative</span> " + esc(SUG_TRIGGER_TITLE || "(initiative)") + ' — showing only its theses'
     const btn = document.createElement("button"); btn.className = "ghost mini"; btn.textContent = "clear filter"
     btn.onclick = clearSugFilter
     el.append(label, btn)
@@ -1864,7 +1929,7 @@
     for (const o of r.options) {
       const row = document.createElement("div")
       row.style.cssText = "display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)"
-      const g = document.createElement("span"); g.style.marginTop = "3px"; g.innerHTML = markSpan("inf_hollow", "mk-inf"); row.appendChild(g)
+      const g = document.createElement("span"); g.style.marginTop = "3px"; g.innerHTML = markSpan("thesis", "mk-inf"); row.appendChild(g)
       const txt = document.createElement("div"); txt.style.flex = "1"
       // Feedback #8: the reword is editable in place — a textarea prefilled with the
       // model's sentence, so you tune it manually before disposing it in. Use applies
@@ -2242,7 +2307,7 @@
     if (sigs.length) {
       const sim = (typeof opts.best_sim === "number") ? opts.best_sim.toFixed(3) : null
       h += '<p class="col-head soft-head">Ranked on' + (sim ? ' <span class="side">· fit ' + sim + (opts.top_kind ? " · " + esc(opts.top_kind) : "") + '</span>' : "") + "</p>"
-      for (const sg of sigs) h += '<div class="prow">' + markSpan("inf_hollow", "mk-inf") + " " + esc(sg) + "</div>"
+      for (const sg of sigs) h += '<div class="prow">' + markSpan("thesis", "mk-work") + " " + esc(sg) + "</div>"
     }
     h += '<div class="ground-soft"><p class="hint">reading the soft layer…</p></div>'
     mount.innerHTML = h + "</div>"
@@ -2802,6 +2867,16 @@
       })
       head.appendChild(cb)
     }
+    // Day 143 · the task's own mark, carrying its lifecycle: a gold square outline that fills
+    // into the commons' `outcome` glyph on completion, and goes dashed if it did not hold.
+    // The card previously marked its person and org but never itself, so a task was the only
+    // object in the console with no glyph of its own.
+    const tm = document.createElement("span")
+    tm.innerHTML = taskMark(t.status)
+    tm.style.marginRight = "7px"
+    tm.title = t.status === "completed" ? "Completed — a recorded outcome"
+      : t.status === "abandoned" ? "Abandoned" : "Open — an outcome that has not happened yet"
+    head.appendChild(tm)
     head.appendChild(document.createTextNode(t.current_action || "(no action)"))
     card.appendChild(head)
 
@@ -2994,7 +3069,7 @@
       row.dataset.pid = p.id
       if (PROP_OPEN === p.id) row.classList.add("sel")
       const t = document.createElement("div"); t.className = "rclaim"
-      t.innerHTML = markSpan("inf_hollow", "mk-inf") + " " + esc(p.title)
+      t.innerHTML = markSpan("stream", "mk-inf") + " " + esc(p.title)
       row.appendChild(t)
       const m = document.createElement("div"); m.className = "rmeta"
       m.innerHTML = '<span style="color:var(--gold)">' + esc(p.product || p.kind) + "</span>"
@@ -3569,7 +3644,7 @@
       row.appendChild(cb)
       const body = document.createElement("div"); body.style.flex = "1"
       const t = document.createElement("div"); t.style.cssText = "font-family:'IBM Plex Mono',monospace;font-size:12.5px"
-      t.innerHTML = markSpan("inf_hollow", "mk-inf") + " " + esc(c.title)
+      t.innerHTML = markSpan("stream", "mk-inf") + " " + esc(c.title)
       body.appendChild(t)
       const m = document.createElement("div"); m.className = "hint"; m.style.marginTop = "3px"
       m.textContent = [c.product || c.kind, c.status,
@@ -3697,7 +3772,7 @@
       const card = document.createElement("div")
       card.className = "mg-parent" + (p.role === "carried" ? " is-carried" : p.role === "dropped" ? " is-dropped" : "")
       const t = document.createElement("div"); t.style.cssText = "font-family:'IBM Plex Mono',monospace;font-size:12.5px"
-      t.innerHTML = markSpan("inf_hollow", "mk-inf") + " " + esc(p.title)
+      t.innerHTML = markSpan("stream", "mk-inf") + " " + esc(p.title)
       card.appendChild(t)
       const m = document.createElement("div"); m.className = "hint"; m.style.marginTop = "3px"
       m.textContent = [p.status, (p.tasks || 0) + " task" + (p.tasks === 1 ? "" : "s"),
@@ -4068,6 +4143,45 @@
   function fmtFit(x) { return x == null ? "—" : Number(x).toFixed(3) }
   function fmtDay(x) { return x ? String(x).slice(0, 10) : "—" }
 
+  // Day 143 — add a source. The kind selector rewrites the ref field's label and placeholder
+  // because `ref` holds two different things (a URL, or a Gmail label) and a field labelled
+  // "Feed URL" that wants "currents/digest" is how you get a subscription that fetches nothing.
+  function syncFeedKind() {
+    const k = $("f_kind").value
+    const inert = k !== "rss"
+    $("f_inert").classList.toggle("hidden", !inert)
+    const lab = $("f_ref").previousElementSibling
+    if (k === "email") {
+      lab.textContent = "Gmail label *"
+      $("f_ref").placeholder = "currents/digest"
+    } else {
+      lab.textContent = k === "html" ? "Page URL *" : "Feed URL *"
+      $("f_ref").placeholder = "https://example.com/feed/"
+    }
+  }
+
+  async function addFeed() {
+    const out = $("f_out")
+    const payload = {
+      kind: $("f_kind").value,
+      ref: $("f_ref").value.trim(),
+      label: $("f_label").value.trim(),
+      sectors: $("f_sectors").value,
+      topics: $("f_topics").value,
+    }
+    if (!payload.ref || !payload.label) { show(out, "Ref and label are both required.", false); return }
+    show(out, "adding…", true)
+    try {
+      const r = await api("add_feed", payload)
+      // Report the server's note verbatim rather than a generic "added". For a non-rss kind
+      // that note is the whole point: the row exists and nothing will read it.
+      show(out, r.note || "Added.", true)
+      for (const id of ["f_ref", "f_label", "f_sectors", "f_topics"]) $(id).value = ""
+      // If the sources panel is open on News, it is now stale by one row.
+      if (!$("sourcesBox").classList.contains("hidden")) loadSources()
+    } catch (e) { show(out, e.message, false) }
+  }
+
   async function loadSources() {
     const host = $("sourcesBody"); host.innerHTML = '<p class="empty">loading…</p>'
     try { renderSources(await api("list_sources", {})) }
@@ -4414,7 +4528,7 @@
     else if (it.fit_state === "parked") actions.append(mk("Validate", "validate", "mini"), mk("Hold", "hold", "mini ghost"))
     else actions.append(mk("Hold", "hold", "mini ghost"), mk("Park", "park", "mini ghost"))
     const thBtn = document.createElement("button"); thBtn.className = "mini ghost"
-    thBtn.innerHTML = markSpan("inf_hollow", "mk-inf") + " thesis"
+    thBtn.innerHTML = markSpan("thesis", "mk-inf") + " thesis"
     thBtn.title = "Turn into a landscape thesis in your Theses feed"
     thBtn.onclick = () => newsToThesis(it, thBtn)
     const anBtn = document.createElement("button"); anBtn.className = "mini ghost"; anBtn.textContent = "Analyze"
@@ -4581,6 +4695,8 @@
     $("sourcesToggle").classList.toggle("active", open)
     if (open) loadSources()
   })
+  $("addFeedBtn").addEventListener("click", addFeed)
+  $("f_kind").addEventListener("change", syncFeedKind)
   $("navPropositions").addEventListener("click", showPropositions)
   $("navNews").addEventListener("click", showNews)
   initNewsStateNav()
