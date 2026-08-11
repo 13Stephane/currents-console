@@ -719,6 +719,9 @@
   function enterApp() {
     $("gatePanel").classList.add("hidden")
     $("app").classList.remove("hidden")
+    // Seed the due count without visiting Tasks: a badge that only appears once you have
+    // already gone looking is the passive-chip problem again, one level up.
+    api("list_tasks", {}).then((r) => paintDueBadge(r.tasks || [])).catch(() => {})
     // Land on Dispose, not Add — disposal is the operator's primary act (system
     // proposes, human disposes), and the feed is no longer empty (28+ pending).
     showDispose()
@@ -975,6 +978,7 @@
     // No width toggle here. Switching the wrap's max-width per view moved the nav
     // itself (the wrap is centred) — width is now a per-view CSS concern, not a
     // body-class one. See the .wrap comment.
+    paintDueBadge()   // the badge inverts on the active tab, so it repaints on every switch
   }
   function showAdd() { setNav("navAdd"); $("rm_q").focus(); loadRelevanceTargets() }
 
@@ -2418,6 +2422,7 @@
       ])
       TASK_PROPS = pr.propositions || []
       TASKS_CACHE = r.tasks || []
+      paintDueBadge(TASKS_CACHE)
       renderTasks(TASKS_CACHE)
     } catch (e) { host.textContent = e.message }
   }
@@ -2495,15 +2500,30 @@
     const host = $("tasksList"); host.innerHTML = ""
     renderTaskSelBar()
     if (!tasks.length) { host.innerHTML = '<p class="hint">No tasks. Accept or edit a suggestion in Dispose to spawn one.</p>'; return }
+    // Due work leads, in BOTH modes and ahead of every other grouping. A task past its review
+    // date is not one more item in a list — it is the only thing the console is asking you to
+    // answer, and it was previously reachable only by reading chips card by card.
+    const due = tasks.filter(isDue)
+    const rest = tasks.filter((t) => !isDue(t))
+    if (due.length) {
+      host.appendChild(taskGroupHeader("Due for review · " + due.length,
+        "Past their review date. Each wants one of three answers: Complete (did it), Abandon (dropped it), or Still live (neither \u2014 push the date out). Renewing is recorded, so declining to close is a signal rather than silence."))
+      // Most overdue first: the longest-ignored is the one the answer is most owed on.
+      for (const t of due.slice().sort((a, b) => new Date(a.review_at) - new Date(b.review_at))) {
+        host.appendChild(taskCard(t))
+      }
+    }
+    if (!rest.length) return
+
     if (TASK_SORT === "donext") {
-      const ranked = tasks.slice().sort((a, b) => doNextScore(b) - doNextScore(a))
+      const ranked = rest.slice().sort((a, b) => doNextScore(b) - doNextScore(a))
       host.appendChild(taskGroupHeader("Do next · " + ranked.length,
         "One ranked list across every proposition, oldest-pressing first. Use \u201cStill live\u201d to push a task's review date out."))
       for (const t of ranked) host.appendChild(taskCard(t))
       return
     }
-    const unassigned = tasks.filter((t) => !t.proposition_id)
-    const assigned = tasks.filter((t) => t.proposition_id)
+    const unassigned = rest.filter((t) => !t.proposition_id)
+    const assigned = rest.filter((t) => t.proposition_id)
     if (unassigned.length) {
       host.appendChild(taskGroupHeader("Unassigned · " + unassigned.length,
         "Standalone tasks, not tied to any proposition. Legitimate for one-off relationship maintenance — or file one into a workspace with the picker."))
@@ -2689,6 +2709,7 @@
       // opened from this tab can be filed without first visiting Tasks.
       TASK_PROPS = pr.propositions || []
       PROP_FLOATERS = (tr.tasks || []).filter((t) => !t.proposition_id && (t.status === "open"))
+      paintDueBadge(tr.tasks || [])
       renderPropRail(pr.propositions || [])
     } catch (e) { host.innerHTML = ""; host.textContent = e.message }
   }
@@ -2944,7 +2965,18 @@
     // Same renderer as the Tasks tab, so a task reads and behaves identically wherever it is
     // seen — including the proposition picker, which is how a task filed into the wrong
     // workspace gets moved from the screen where you actually notice it.
-    for (const t of lane) hz.appendChild(taskCard(t, { bulk: false }))
+    // get_proposition already orders review_at asc nulls last, so the due ones lead; the rule
+    // just marks where they stop, matching the "Due for review" group on the Tasks tab.
+    let ruled = false
+    for (const t of lane) {
+      if (!ruled && !isDue(t) && lane.some(isDue)) {
+        const r = document.createElement("div"); r.className = "hint"
+        r.style.cssText = "border-top:1px solid var(--line);margin:10px 0 8px;padding-top:6px"
+        r.textContent = "not yet due"
+        hz.appendChild(r); ruled = true
+      }
+      hz.appendChild(taskCard(t, { bulk: false }))
+    }
     host.appendChild(hz)
     if (doneTasks.length) {
       const byStatus = {}
@@ -2994,6 +3026,29 @@
   //   review_count is shown only once it is non-zero, where it stops being noise and starts
   //   being the reading: a task renewed four times is the operator declining to close, four
   //   times, and that is a fact about the work.
+  // One definition of "due", used by the chip, the sort, and the tab badge — so the number on
+  // the tab can never disagree with the rows underneath it.
+  function isDue(t) {
+    return t.status === "open" && t.review_at && new Date(t.review_at).getTime() <= Date.now()
+  }
+
+  // Day 141 — the clock needed an alarm. review_at shipped as a passive chip you only saw after
+  // opening a card, on a tab you had to choose to visit: a deadline with no notification. The
+  // count rides on the nav itself so the backlog is unavoidable rather than discoverable.
+  let DUE_COUNT = 0
+  function paintDueBadge(tasks) {
+    if (tasks) DUE_COUNT = tasks.filter(isDue).length
+    const btn = $("navTasks"); if (!btn) return
+    btn.textContent = "Tasks"
+    if (!DUE_COUNT) return
+    const b = document.createElement("span")
+    b.style.cssText = "margin-left:7px;font-weight:600;color:"
+      // The active tab is gold-filled, where a gold badge would be invisible.
+      + ($("navTasks").classList.contains("active") ? "var(--bg)" : "var(--gold)")
+    b.textContent = "· " + DUE_COUNT + " due"
+    btn.appendChild(b)
+  }
+
   function reviewChip(t) {
     if (!t.review_at || t.status !== "open") return null
     const due = new Date(t.review_at)
