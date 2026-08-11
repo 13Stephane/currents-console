@@ -344,7 +344,7 @@
     <div class="nav">
       <button id="navNews">News</button>
       <button id="navDispose" class="active">Theses</button>
-      <button id="navPropositions">Propositions</button>
+      <button id="navPropositions">Streams</button>
       <button id="navTasks">Tasks</button>
       <button id="navAdd" style="margin-left:auto">Find / add</button>
     </div>
@@ -382,9 +382,9 @@
          it ranks and shows the grounding, and writes nothing. -->
     <div class="panel" id="relevancePanel">
       <h2>Who fits this work?</h2>
-      <p class="hint">Pick a proposition or an open task — or paste any text — and Currents ranks the people whose <em>current</em> drivers and needs sit closest to it, showing the signal that made each one rank. <strong>Read-only.</strong> It proposes names; it writes nothing, mints no thesis, and routes nothing into your feed. Acting on a name is a separate, deliberate step.</p>
+      <p class="hint">Pick a stream or an open task — or paste any text — and Currents ranks the people whose <em>current</em> drivers and needs sit closest to it, showing the signal that made each one rank. <strong>Read-only.</strong> It proposes names; it writes nothing, mints no thesis, and routes nothing into your feed. Acting on a name is a separate, deliberate step.</p>
       <label>Against</label>
-      <select id="rel_target"><option value="">— pick a proposition or task —</option></select>
+      <select id="rel_target"><option value="">— pick a stream or task —</option></select>
       <label>Or any text</label>
       <input id="rel_text" placeholder="an intent, a topic, a positioning line…" autocomplete="off">
       <button id="rel_btn">Rank people</button>
@@ -616,7 +616,7 @@
       <!-- Day 141: the three controls sit on the heading line. They were a button plus two
            <summary> rows stacked underneath, which read as three different kinds of thing
            when they are three ways to change the same list. -->
-      <h2 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:0">Propositions
+      <h2 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:0">Streams
         <button class="ghost mini" id="propRefresh" style="margin-left:6px">refresh</button>
         <button class="ghost mini" id="propNewToggle">+ new</button>
         <button class="ghost mini" id="propMergeToggle">merge</button>
@@ -628,13 +628,13 @@
           <select id="p_kind"><option value="product">product (one per Compass product)</option><option value="project">project (multi-stakeholder)</option></select>
           <label>Product</label><input id="p_product" placeholder="Currents">
           <label>Thesis statement</label><textarea id="p_thesis" rows="2" placeholder="The positioning / intent for this workspace…"></textarea>
-          <button id="p_createBtn" style="margin-top:8px">Create proposition</button>
+          <button id="p_createBtn" style="margin-top:8px">Create stream</button>
           <div class="out" id="p_createOut" style="margin-top:8px"></div>
         </div>
       </div>
       <div id="mergePicker" class="hidden">
         <div style="margin-top:8px">
-          <p class="hint">Pick two or more, then open the composer. Only <em>active</em> and <em>paused</em> propositions are listed: <em>won</em> is current but not mergeable, and the RPC refuses it.</p>
+          <p class="hint">Pick two or more, then open the composer. Only <em>active</em> and <em>paused</em> streams are listed: <em>won</em> is current but not mergeable, and the RPC refuses it.</p>
           <div id="mg_candidates" style="margin-top:10px"></div>
           <div class="acts">
             <button id="mg_openBtn" class="btn-accept mini">Open composer</button>
@@ -654,7 +654,7 @@
       <div class="col">
         <div class="rail" id="propRail"></div>
       </div>
-      <div class="col detail" id="propDetail"><p class="empty">Select a proposition or a floating task.</p></div>
+      <div class="col detail" id="propDetail"><p class="empty">Select a stream or a floating task.</p></div>
     </div>
     </div><!-- /propositionsView -->
   </div>
@@ -995,7 +995,7 @@
         api("list_tasks", {}).catch(() => ({ tasks: [] })),
       ])
       REL_TARGETS = {}
-      sel.innerHTML = '<option value="">— pick a proposition or task —</option>'
+      sel.innerHTML = '<option value="">— pick a stream or task —</option>'
       const add = (group, rows, key, label) => {
         if (!rows.length) return
         const g = document.createElement("optgroup"); g.label = group
@@ -1777,7 +1777,7 @@
   // successors are editable in place, exactly as reframe's rewordings are: you tune the wording
   // before disposing it in, you do not pick and choose which folds happen.
   async function openRestructure(pid, mount) {
-    mount.innerHTML = '<p class="hint">Reading every open task in this proposition…</p>'
+    mount.innerHTML = '<p class="hint">Reading every open task in this stream…</p>'
     let r
     try { r = await api("propose_task_restructure", { proposition_id: pid }) }
     catch (e) { mount.innerHTML = '<p class="out err" style="display:block">' + esc(e.message) + "</p>"; return }
@@ -2194,7 +2194,7 @@
       wrap.appendChild(w)
     }
     const sel = document.createElement("select")
-    const none = document.createElement("option"); none.value = ""; none.textContent = "— standalone (no proposition) —"
+    const none = document.createElement("option"); none.value = ""; none.textContent = "— standalone (no stream) —"
     sel.appendChild(none)
     for (const p of TASK_PROPS) {
       if (p.status === "dropped" || p.status === "archived") continue
@@ -2465,7 +2465,7 @@
     // Rebuild the target list each time — TASK_PROPS may have been refreshed underneath us.
     sel.innerHTML = ""
     const none = document.createElement("option")
-    none.value = ""; none.textContent = "— detach (no proposition) —"
+    none.value = ""; none.textContent = "— detach (no stream) —"
     sel.appendChild(none)
     for (const p of TASK_PROPS) {
       const o = document.createElement("option"); o.value = p.id; o.textContent = p.title
@@ -2518,7 +2518,7 @@
     if (TASK_SORT === "donext") {
       const ranked = rest.slice().sort((a, b) => doNextScore(b) - doNextScore(a))
       host.appendChild(taskGroupHeader("Do next · " + ranked.length,
-        "One ranked list across every proposition, oldest-pressing first. Use \u201cStill live\u201d to push a task's review date out."))
+        "One ranked list across every stream, oldest-pressing first. Use \u201cStill live\u201d to push a task's review date out."))
       for (const t of ranked) host.appendChild(taskCard(t))
       return
     }
@@ -2526,11 +2526,11 @@
     const assigned = rest.filter((t) => t.proposition_id)
     if (unassigned.length) {
       host.appendChild(taskGroupHeader("Unassigned · " + unassigned.length,
-        "Standalone tasks, not tied to any proposition. Legitimate for one-off relationship maintenance — or file one into a workspace with the picker."))
+        "Standalone tasks, not tied to any stream. Legitimate for one-off relationship maintenance — or file one into a stream with the picker."))
       for (const t of unassigned) host.appendChild(taskCard(t))
     }
     if (assigned.length) {
-      host.appendChild(taskGroupHeader("In a proposition · " + assigned.length, null))
+      host.appendChild(taskGroupHeader("In a stream · " + assigned.length, null))
       for (const t of assigned) host.appendChild(taskCard(t))
     }
   }
@@ -2622,8 +2622,8 @@
   function taskPropPicker(t) {
     const sel = document.createElement("select")
     sel.style.cssText = "font-size:12px;padding:3px 6px"
-    sel.title = "File this task into a proposition (or leave it standalone)"
-    const none = document.createElement("option"); none.value = ""; none.textContent = "— no proposition —"
+    sel.title = "File this task into a stream (or leave it standalone)"
+    const none = document.createElement("option"); none.value = ""; none.textContent = "— no stream —"
     if (!t.proposition_id) none.selected = true
     sel.appendChild(none)
     let hasCurrent = false
@@ -2720,6 +2720,12 @@
     h.textContent = text; return h
   }
 
+  // "complete" alone says nothing; the outcome is the informative half. One formatter, used
+  // by the rail and the detail head, so they cannot disagree.
+  function streamState(p) {
+    return p.status === "complete" && p.outcome ? "complete · " + p.outcome : p.status
+  }
+
   function renderPropRail(allProps) {
     const host = $("propRail"); host.innerHTML = ""
     // Day 141: a dropped proposition is a closed decision, not a workspace. It stays in the
@@ -2728,7 +2734,7 @@
     const props = allProps.filter((p) => p.status !== "dropped")
     const droppedCount = allProps.length - props.length
     const ph = document.createElement("div"); ph.className = "col-h"; ph.style.paddingTop = "14px"
-    ph.textContent = "Propositions · " + props.length
+    ph.textContent = "Streams · " + props.length
     host.appendChild(ph)
     if (!props.length) {
       host.appendChild(Object.assign(document.createElement("p"),
@@ -2743,7 +2749,7 @@
       row.appendChild(t)
       const m = document.createElement("div"); m.className = "rmeta"
       m.innerHTML = '<span style="color:var(--gold)">' + esc(p.product || p.kind) + "</span>"
-        + " · " + esc(p.status)
+        + " · " + esc(streamState(p))
         + " · " + p.tasks_open + " open"
         + " · " + p.stakeholders + " stkhldr"
       row.appendChild(m)
@@ -2753,7 +2759,7 @@
     if (droppedCount) {
       const d = document.createElement("p"); d.className = "empty"
       d.style.cssText = "padding:8px 16px;font-size:11px"
-      d.textContent = droppedCount + (droppedCount === 1 ? " dropped proposition is" : " dropped propositions are") + " hidden."
+      d.textContent = droppedCount + (droppedCount === 1 ? " dropped stream is" : " dropped streams are") + " hidden."
       host.appendChild(d)
     }
 
@@ -2809,7 +2815,7 @@
     const host = $("propDetail"); host.innerHTML = ""
     const t = PROP_FLOATERS.find((x) => x.id === id)
     if (!t) { host.innerHTML = '<p class="empty">—</p>'; return }
-    const h = document.createElement("div"); h.className = "subject"; h.textContent = "floating task · no proposition"
+    const h = document.createElement("div"); h.className = "subject"; h.textContent = "floating task · no stream"
     host.appendChild(h)
     // bulk:false for the same reason as the proposition list — the selection bar it reports to
     // lives on the Tasks tab, so here the checkbox would tick and do nothing.
@@ -2867,7 +2873,7 @@
     const host = $("propDetail"); host.innerHTML = ""
     const h = document.createElement("h2"); h.textContent = p.title
     const st = document.createElement("span"); st.className = "hint"; st.style.marginLeft = "10px"
-    st.innerHTML = '<span style="color:var(--gold)">' + esc(p.product || p.kind) + "</span> · " + esc(p.status)
+    st.innerHTML = '<span style="color:var(--gold)">' + esc(p.product || p.kind) + "</span> · " + esc(streamState(p))
     h.appendChild(st); host.appendChild(h)
     if (p.thesis_statement) {
       const ts = document.createElement("div"); ts.style.cssText = "font-style:italic;color:var(--ink-dim);margin:4px 0 10px"
@@ -2909,9 +2915,29 @@
     const lifeLab = document.createElement("span"); lifeLab.className = "hint"
     lifeLab.style.cssText = "margin:0 4px 0 0;align-self:center"; lifeLab.textContent = "outcome"
     life.appendChild(lifeLab)
-    for (const s of ["active", "paused", "won", "dropped", "archived"]) {
-      if (s === p.status) continue
-      life.appendChild(mini(s, "btn-snooze", () => setPropStatus(p.id, s)))
+    // Day 141: `complete` carries an outcome (won|lost|ended), but the operator gets ONE click
+    // per outcome rather than a status picker followed by an outcome picker. The sub-status
+    // never has to be explained because it is never seen as a separate step.
+    //
+    // `dropped` sits apart from `ended` on purpose and the labels say so: dropping is
+    // withdrawing before a conclusion, and it is what v_proposition_withdrawal divides by.
+    const LIFE = [
+      { label: "paused",   status: "paused" },
+      { label: "won",      status: "complete", outcome: "won",   title: "Concluded in your favour" },
+      { label: "lost",     status: "complete", outcome: "lost",  title: "Concluded against you" },
+      { label: "ended",    status: "complete", outcome: "ended", title: "Ran its course — neither won nor lost" },
+      { label: "dropped",  status: "dropped",  title: "You withdrew before it concluded — this is what the withdrawal rate counts" },
+      { label: "archived", status: "archived" },
+      { label: "reopen",   status: "active",   title: "Back to active work" },
+    ]
+    for (const o of LIFE) {
+      // Hide the button for the state the stream is already in — including the exact
+      // status+outcome pair, so a won stream still offers "lost" and "ended".
+      if (o.status === p.status && (o.outcome || null) === (p.outcome || null)) continue
+      if (o.status === "active" && p.status === "active") continue
+      const btn = mini(o.label, "btn-snooze", () => setPropStatus(p.id, o.status, o.outcome || null))
+      if (o.title) btn.title = o.title
+      life.appendChild(btn)
     }
     host.appendChild(life); host.appendChild(lnSlot)
 
@@ -3083,9 +3109,11 @@
     try { await api("set_stakeholder_stage", { proposition_id: propId, person_id: personId, stage, comment: "via console propositions tab" }); openProposition(propId) }
     catch (e) { alert(e.message) }
   }
-  async function setPropStatus(propId, status) {
-    try { await api("update_proposition", { proposition_id: propId, status }); loadPropositions(); openProposition(propId) }
-    catch (e) { alert(e.message) }
+  async function setPropStatus(propId, status, outcome) {
+    try {
+      await api("update_proposition", { proposition_id: propId, status, outcome: outcome || null })
+      loadPropositions(); openProposition(propId)
+    } catch (e) { alert(e.message) }
   }
   // taskAct removed Day 141 with taskMini, its only caller. It duplicated updateTaskStatus
   // against the same update_task op, differing only in the refresh it triggered — and it
@@ -3126,7 +3154,7 @@
     catch (e) { mount.innerHTML = '<p class="out err" style="display:block">' + esc(e.message) + "</p>"; return }
     mount.innerHTML = ""
     const wrap = document.createElement("div"); wrap.className = "inline-edit"
-    const lab = document.createElement("label"); lab.textContent = "Fold a pending thesis into this proposition (its org attaches too)"; wrap.appendChild(lab)
+    const lab = document.createElement("label"); lab.textContent = "Fold a pending thesis into this stream (its org attaches too)"; wrap.appendChild(lab)
     if (!sugs.length) { const e = document.createElement("p"); e.className = "hint"; e.textContent = "No pending theses right now."; wrap.appendChild(e) }
     for (const s of sugs.slice(0, 25)) {
       const b = mkBtn("⤵ " + (s.suggested_action || "(thesis)").slice(0, 100), "btn-edit", () => foldOne(p.id, s.id))
@@ -3282,7 +3310,7 @@
   function renderMergeCandidates() {
     const host = $("mg_candidates"); host.innerHTML = ""
     if (!MG_CANDS.length) {
-      host.innerHTML = '<p class="hint">Nothing mergeable. A merge needs two or more propositions that are active or paused.</p>'
+      host.innerHTML = '<p class="hint">Nothing mergeable. A merge needs two or more streams that are active or paused.</p>'
       return
     }
     for (const c of MG_CANDS) {
@@ -3694,7 +3722,7 @@
     const roles = r.declared_roles || null
     const carried = r.carried_parents || []
     if (!carried.length && !roles) {
-      mount.innerHTML = '<p class="hint">No merge in this proposition\'s history. It was created directly, not folded from parents.</p>'
+      mount.innerHTML = '<p class="hint">No merge in this stream\'s history. It was created directly, not folded from parents.</p>'
       return
     }
 
