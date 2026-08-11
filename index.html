@@ -109,6 +109,12 @@
   .hint { color: var(--ink-faint); font-size: 12px; font-family: "IBM Plex Mono", monospace; line-height: 1.5; }
   .hidden { display: none; }
   .mini { margin: 0; padding: 4px 10px; font-size: 11px; }
+  /* Day 143 — a panel's submit button at the mini scale, which is now the console's only
+     button scale. `.mini` alone is not enough here: it zeroes the margin, because it was
+     written for buttons sitting in a gapped `.acts` row, and Find/add's buttons instead
+     follow a field directly. A submit flush against its last input reads as part of the
+     input rather than as an act, so the standoff has to come back explicitly. */
+  button.mini.standoff { margin-top: 14px; }
 
   /* §3.4 disposal surface — view nav + split-reader (Layout C) */
   .nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 26px; }
@@ -202,10 +208,19 @@
   .chip.mini-chip { font-size: 8.5px; gap: 6px; }
   .chip.mini-chip .dot { width: 6px; height: 6px; }
   .empty { color: var(--ink-faint); font-size: 13px; font-family: "IBM Plex Mono", monospace; padding: 18px 16px; }
-  /* Fact/inference grammar (eye slice) — one rule: round/square = Spine (fact, ink),
-     diamond = Soft (inference, gold). Marks come from one source (MARK/markSpan). */
+  /* SUPERSEDED Day 143. This said: "one rule: round/square = Spine (fact, ink), diamond =
+     Soft (inference, gold)". That rule contradicted the published notation in
+     compass_grammar_gallery.html / compass-glyphs.js on two shapes, and the commons is
+     normative — a console that teaches a competing grammar makes the commons non-authoritative,
+     which is the one thing it cannot be (D-00X).
+     The rule is now the gallery's:
+       square = spine fact · circle = soft-layer judgment · diamond = a trigger
+       gold   = committed or graded
+     Marks still come from one source (GLYPH/markSpan). Colour carries the gold axis, so a
+     thesis ring is ink while working and gold once proposed — same shape, same meaning-bearing
+     contrast the gallery uses. */
   .mk { font-family: "IBM Plex Mono", monospace; flex: none; }
-  .mk-person, .mk-org { color: var(--ink-dim); }
+  .mk-person, .mk-org, .mk-work { color: var(--ink-dim); }
   .mk-asset, .mk-inf { color: var(--gold); }
   /* SVG glyph marks — the mockup's visual language. Color set by mk-* (currentColor). */
   .gl { width: 15px; height: 15px; display: inline-block; vertical-align: -2px; flex: none; }
@@ -291,21 +306,59 @@
   .pband.green .dot { background: var(--green); }
   .pband .lbl { color: var(--ink-dim); }
   .sh-profile { float: right; margin: 0; padding: 3px 9px; font-size: 10px; }
+
+  /* ── Footnotes (Day 143) ────────────────────────────────────────────────────
+     Guidance prose is read once and then known; content is read every visit. So the
+     explainers move to the FOOT of the view and leave a marker where they stood, instead
+     of standing between the operator and the list on every single visit. Precedent and
+     proof of the idea: Day 142 moved the News tag glossary off the top of that tab for
+     exactly this reason, and it is the only tab that has stopped feeling like a lecture.
+
+     WHAT DOES NOT GET FOOTNOTED, and why the rule matters more than the pattern:
+       · anything that must be read BEFORE the click — the ⚠ dispatch warning, the merge
+         composer's consequence panel. A warning you have to scroll to is not a warning.
+       · empty states ("No one on this stream yet…"). They ARE the content when they show,
+         and they are absent the rest of the time, so they cost nothing.
+       · field labels and inline output.
+     The test is: would the operator need this on the screen at the moment of acting? If
+     yes it stays where it is, however wordy. Footnoting is for what you learn once. */
+  .fnmark { font-family: "IBM Plex Mono", monospace; font-size: 9px; vertical-align: super;
+    color: var(--gold); text-decoration: none; margin-left: 4px; letter-spacing: 0;
+    cursor: pointer; opacity: .75; }
+  .fnmark:hover { opacity: 1; text-decoration: underline; }
+  .footnotes { margin-top: 38px; padding-top: 15px; border-top: 1px solid var(--line); max-width: 760px; }
+  .footnotes .fn-lead { font-family: "IBM Plex Mono", monospace; font-size: 10px; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--ink-faint); margin-bottom: 13px; }
+  .footnotes ol { margin: 0; padding-left: 24px; }
+  .footnotes li { color: var(--ink-faint); font-size: 12px; font-family: "IBM Plex Mono", monospace;
+    line-height: 1.6; margin-bottom: 10px; padding-left: 3px; }
+  .footnotes li::marker { color: var(--gold); }
+  .footnotes li strong { color: var(--ink-dim); font-weight: 500; }
+  .footnotes li em { color: var(--ink-dim); }
+  /* A jumped-to footnote lifts out of the faint colour for a moment. Without this the marker
+     scrolls you to a block of eight identical grey lines and you hunt for which one moved. */
+  .footnotes li.fn-hit { color: var(--ink); transition: color .2s; }
 </style>
 </head>
 <body>
-<!-- Mark glyphs (the visual language): person = ringed disc, org = enclosure,
-     asset = document, inference = diamond whose fill is calibration. -->
+<!-- Mark glyphs — conformed to the methodology commons Day 143 (D-00X + the extension spec,
+     docs/glyph_commons_extension_2026-08-11.md). The axis is the GALLERY's, not the console's:
+       square = spine fact · circle = soft-layer judgment · diamond = a trigger
+       gold = committed or graded
+     Consequently: person and org are BOTH square (both are spine facts), separated by
+     fill-vs-enclosure (an org contains people); a thesis is a CIRCLE whose ring/disc carries
+     commitment, not calibration; a task is a gold square outline that becomes the commons'
+     `outcome` glyph when it completes; a stream is a discontinuous corner frame; and the
+     diamond belongs to initiatives alone, which is the one mark the console already had right.
+     Calibration has left the shape entirely — it is the .pband dot array and nothing else. -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <!-- spine fact, the atom -->
   <symbol id="g-person" viewBox="0 0 24 24">
-    <circle cx="12" cy="12" r="9.3" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".6"/>
-    <circle cx="12" cy="12" r="4.6" fill="currentColor"/>
+    <rect x="5.5" y="5.5" width="13" height="13" fill="currentColor"/>
   </symbol>
+  <!-- spine fact, the container: same square, hollow, heavier stroke -->
   <symbol id="g-org" viewBox="0 0 24 24">
-    <rect x="4.5" y="6.5" width="15" height="13" rx="1" fill="currentColor"/>
-    <rect x="7.4" y="10" width="3" height="3" fill="var(--bg)"/>
-    <rect x="13.6" y="10" width="3" height="3" fill="var(--bg)"/>
-    <rect x="10.4" y="14.6" width="3.2" height="4.9" fill="var(--bg)"/>
+    <rect x="5.6" y="5.6" width="12.8" height="12.8" fill="none" stroke="currentColor" stroke-width="2.6"/>
   </symbol>
   <symbol id="g-asset" viewBox="0 0 24 24">
     <path d="M6 4.5h8.5L18.5 8.5V19.5H6Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
@@ -313,15 +366,36 @@
     <line x1="8.6" y1="12" x2="15.4" y2="12" stroke="currentColor" stroke-width="1.4"/>
     <line x1="8.6" y1="15" x2="15.4" y2="15" stroke="currentColor" stroke-width="1.4"/>
   </symbol>
-  <symbol id="g-inf-0" viewBox="0 0 24 24">
-    <rect x="6.9" y="6.9" width="10.2" height="10.2" transform="rotate(45 12 12)" fill="none" stroke="currentColor" stroke-width="1.7"/>
+  <!-- soft-layer judgment. Ring = held, disc = accepted; the COLOUR (via mk-*) carries
+       working vs proposed, so two shapes cover all three commitment states. -->
+  <symbol id="g-thesis-ring" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="7.4" fill="none" stroke="currentColor" stroke-width="1.9"/>
   </symbol>
-  <symbol id="g-inf-1" viewBox="0 0 24 24">
-    <rect x="6.9" y="6.9" width="10.2" height="10.2" transform="rotate(45 12 12)" fill="none" stroke="currentColor" stroke-width="1.7"/>
-    <path d="M12 12 L19.2 12 L12 19.2 L4.8 12 Z" fill="currentColor"/>
+  <symbol id="g-thesis-disc" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="8" fill="currentColor"/>
   </symbol>
-  <symbol id="g-inf-2" viewBox="0 0 24 24">
-    <rect x="6.9" y="6.9" width="10.2" height="10.2" transform="rotate(45 12 12)" fill="currentColor" stroke="currentColor" stroke-width="1.7"/>
+  <!-- a task is an outcome that has not happened yet: gold square outline → the commons'
+       filled gold `outcome` square when it completes. Dashed = it did not hold. -->
+  <symbol id="g-task" viewBox="0 0 24 24">
+    <rect x="5.7" y="5.7" width="12.6" height="12.6" fill="none" stroke="currentColor" stroke-width="2.1"/>
+  </symbol>
+  <symbol id="g-task-done" viewBox="0 0 24 24">
+    <rect x="5.5" y="5.5" width="13" height="13" fill="currentColor"/>
+  </symbol>
+  <symbol id="g-task-abandoned" viewBox="0 0 24 24">
+    <rect x="5.7" y="5.7" width="12.6" height="12.6" fill="none" stroke="currentColor" stroke-width="2.1" stroke-dasharray="2 2.2"/>
+  </symbol>
+  <!-- a stream is a boundary drawn around work, not a thing in its own right: four corner
+       ticks, no full edges. Cannot be confused with the fact square or the task square. -->
+  <symbol id="g-stream" viewBox="0 0 24 24">
+    <path d="M4.6 9.4V4.6h4.8M14.6 4.6h4.8v4.8M19.4 14.6v4.8h-4.8M9.4 19.4H4.6v-4.8"
+          fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="square"/>
+  </symbol>
+  <!-- the trigger family. The console's `◆ initiative` was already correct under the gallery
+       axis — an initiative IS a triggers row — and nobody intended it. Now it is the only
+       diamond, rather than sharing the shape with propositions and confidence. -->
+  <symbol id="g-initiative" viewBox="0 0 24 24">
+    <path d="M12 3.4 L20.6 12 L12 20.6 L3.4 12 Z" fill="currentColor"/>
   </symbol>
   <symbol id="g-sounding" viewBox="0 0 100 100">
     <circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" stroke-width="2" opacity=".22"/>
@@ -368,8 +442,7 @@
       <div class="add-col">
         <div class="col-lead">Find, resolve, act<span>ask what you already hold — and set work in motion</span></div>
     <div class="panel" id="finderPanel">
-      <h2>Find or add</h2>
-      <p class="hint">Search what you already know — people and organizations — before adding, so you never make a duplicate. Type a name; add precision keys (email / LinkedIn) to resolve exactly. Nothing matches? Add it inline. Read-only search; keys resolve precisely, a name alone surfaces every twin (never auto-matched).</p>
+      <h2>Find or add<a class="fnmark" href="#fn-add-1">1</a></h2>
       <input id="rm_q" placeholder="Search people &amp; orgs by name…" autocomplete="off">
       <details id="find_keys" style="margin-top:8px">
         <summary class="hint" style="cursor:pointer;user-select:none">precision keys — email · LinkedIn · people-at-org</summary>
@@ -391,38 +464,37 @@
          this answers "who, of everyone I know, belongs on this piece of work". Read-only:
          it ranks and shows the grounding, and writes nothing. -->
     <div class="panel" id="relevancePanel">
-      <h2>Who fits this work?</h2>
-      <p class="hint">Pick a stream or an open task — or paste any text — and Currents ranks the people whose <em>current</em> drivers and needs sit closest to it, showing the signal that made each one rank. <strong>Read-only.</strong> It proposes names; it writes nothing, mints no thesis, and routes nothing into your feed. Acting on a name is a separate, deliberate step.</p>
+      <h2>Who fits this work?<a class="fnmark" href="#fn-add-2">2</a></h2>
       <label>Against</label>
       <select id="rel_target"><option value="">— pick a stream or task —</option></select>
       <label>Or any text</label>
       <input id="rel_text" placeholder="an intent, a topic, a positioning line…" autocomplete="off">
-      <button id="rel_btn">Rank people</button>
+      <button id="rel_btn" class="mini standoff">Rank people</button>
       <div id="rel_out" style="margin-top:4px"></div>
     </div>
 
     <div class="panel">
-      <h2>Ambiguous matches <button class="ghost mini" id="refreshBtn" style="margin-left:10px">refresh</button></h2>
-      <p class="hint">Same-name twins routed for human disposal (§3.6). Never auto-merged.</p>
+      <h2>Ambiguous matches<a class="fnmark" href="#fn-add-3">3</a> <button class="ghost mini" id="refreshBtn" style="margin-left:10px">refresh</button></h2>
       <div id="pending" style="margin-top:10px"></div>
     </div>
     <!-- Initiatives (folded in Day 129): a top-down create/act surface. Was a standalone
          nav tab; now one of the create surfaces in Find/add. Handlers (initiativeDryRun /
          initiativeDispatch) are unchanged — they key on the same i_* ids. -->
     <div class="panel">
-      <h2>Active initiatives <button class="ghost mini" id="initListRefresh" style="margin-left:10px">load / refresh</button></h2>
-      <p class="hint">Themes you've dispatched. Each ranked people and minted one fit-thesis per person into your <strong>Theses</strong> feed — click a row to see those theses.</p>
+      <h2>Active initiatives<a class="fnmark" href="#fn-add-4">4</a> <button class="ghost mini" id="initListRefresh" style="margin-left:10px">load / refresh</button></h2>
       <div id="initList" style="margin-top:10px"></div>
     </div>
     <div class="panel">
-      <h2>Declare an initiative</h2>
-      <p class="hint">A top-down theme dispatched as <em>individuated</em> fit-hypotheses — never a mail-merge. Currents embeds the intent, ranks people by how their current drivers/needs fit it, and composes one grounded fit-claim per person that rides the normal disposal feed. <strong>Step 1: dry-run</strong> to read the fit distribution and pick a floor from data. <strong>Step 2: dispatch</strong> at that floor.</p>
+      <h2>Declare an initiative<a class="fnmark" href="#fn-add-5">5</a></h2>
+      <!-- The two-step sequence stays ON the surface: it is not background, it is the
+           procedure, and step 2 is a live write. Only the rationale is footnoted. -->
+      <p class="hint"><strong>Step 1: dry-run</strong> to read the fit distribution and pick a floor from data. <strong>Step 2: dispatch</strong> at that floor.</p>
       <label>Intent *</label>
       <textarea id="i_intent" placeholder="e.g. AI in professional-service firms: job-design &amp; transformation"></textarea>
       <div class="row">
         <div><label>Sample limit</label><input id="i_limit" value="100"></div>
       </div>
-      <button id="i_dryBtn">Dry-run · preview fit</button>
+      <button id="i_dryBtn" class="mini standoff">Dry-run · preview fit</button>
       <div class="out" id="i_dry_out"></div>
       <div id="i_dist" class="hidden" style="margin-top:16px"></div>
       <div id="i_cands" class="search-results" style="margin-top:10px"></div>
@@ -438,7 +510,7 @@
         <div><label>Weak-fit below</label><input id="i_weak" placeholder="e.g. 0.50 (optional)"></div>
         <div><label>Cap (max people)</label><input id="i_cap" value="8"></div>
       </div>
-      <button id="i_liveBtn">Dispatch initiative</button>
+      <button id="i_liveBtn" class="mini standoff">Dispatch initiative</button>
       <div class="out" id="i_live_out"></div>
       <div id="i_results" style="margin-top:10px"></div>
     </div>
@@ -463,13 +535,12 @@
       </div>
       <label>Background / context</label>
       <textarea id="p_background" placeholder="How you know them, what they do…"></textarea>
-      <button id="addPersonBtn">Add to spine</button>
+      <button id="addPersonBtn" class="mini standoff">Add to spine</button>
       <div class="out" id="p_out"></div>
     </div>
 
     <div class="panel">
-      <h2>Log a note</h2>
-      <p class="hint">Raw signal into person_raw_inputs — the fuel person-listener extracts from. Search for the person, or it auto-fills after an add.</p>
+      <h2>Log a note<a class="fnmark" href="#fn-add-6">6</a></h2>
       <label>Find person</label>
       <input id="n_search" placeholder="Type a name…" autocomplete="off">
       <div id="n_results" class="search-results"></div>
@@ -485,7 +556,7 @@
       </div>
       <label>Text *</label>
       <textarea id="n_text" placeholder="What happened / what you learned…"></textarea>
-      <button id="addNoteBtn">Append</button>
+      <button id="addNoteBtn" class="mini standoff">Append</button>
       <div class="out" id="n_out"></div>
     </div>
 
@@ -500,13 +571,12 @@
       <div class="row">
         <div><label>Industry</label><input id="o_industry" placeholder="manufacturing"></div>
       </div>
-      <button id="addOrgBtn">Add to spine</button>
+      <button id="addOrgBtn" class="mini standoff">Add to spine</button>
       <div class="out" id="o_out"></div>
     </div>
 
     <div class="panel">
-      <h2>Add asset</h2>
-      <p class="hint">Your own content — value props, writings, talks. The resonator scores these against world-events; outreach-composer cites them. Not derived from the spine — this is the only way to seed them.</p>
+      <h2>Add asset<a class="fnmark" href="#fn-add-7">7</a></h2>
       <label>Title *</label>
       <input id="a_title" placeholder="e.g. AI strategy advisory for biotech R&amp;D">
       <div class="row">
@@ -528,17 +598,32 @@
         <div><label>URL</label><input id="a_url" placeholder="https://…"></div>
         <div><label>Tags (comma-separated)</label><input id="a_tags" placeholder="ai, strategy, biotech"></div>
       </div>
-      <button id="addAssetBtn">Add asset</button>
+      <button id="addAssetBtn" class="mini standoff">Add asset</button>
       <div class="out" id="a_out"></div>
     </div>
 
     <div class="panel">
-      <h2>Asset library <button class="ghost mini" id="libRefreshBtn" style="margin-left:10px">load / refresh</button></h2>
-      <p class="hint">Your seeded assets, ordered by the resonator's live relevance score. Click “edit” to revise one (re-embeds on save when title/summary/body change).</p>
+      <h2>Asset library<a class="fnmark" href="#fn-add-8">8</a> <button class="ghost mini" id="libRefreshBtn" style="margin-left:10px">load / refresh</button></h2>
       <div id="library" style="margin-top:10px"></div>
     </div>
 
       </div>
+    </div>
+    <!-- Day 143 · footnotes. Eight explainers came off eight panel headings; the text is
+         verbatim, only relocated. The ⚠ dispatch warning and the initiative's two-step
+         sequence stayed on the surface — see the .footnotes CSS block for the rule. -->
+    <div class="footnotes" id="fnAdd">
+      <div class="fn-lead">Notes</div>
+      <ol>
+        <li id="fn-add-1"><strong>Find or add.</strong> Search what you already know — people and organizations — before adding, so you never make a duplicate. Type a name; add precision keys (email / LinkedIn) to resolve exactly. Nothing matches? Add it inline. Read-only search; keys resolve precisely, a name alone surfaces every twin (never auto-matched).</li>
+        <li id="fn-add-2"><strong>Who fits this work?</strong> Pick a stream or an open task — or paste any text — and Currents ranks the people whose <em>current</em> drivers and needs sit closest to it, showing the signal that made each one rank. <strong>Read-only.</strong> It proposes names; it writes nothing, mints no thesis, and routes nothing into your feed. Acting on a name is a separate, deliberate step.</li>
+        <li id="fn-add-3"><strong>Ambiguous matches.</strong> Same-name twins routed for human disposal (§3.6). Never auto-merged.</li>
+        <li id="fn-add-4"><strong>Active initiatives.</strong> Themes you've dispatched. Each ranked people and minted one fit-thesis per person into your <strong>Theses</strong> feed — click a row to see those theses.</li>
+        <li id="fn-add-5"><strong>Declare an initiative.</strong> A top-down theme dispatched as <em>individuated</em> fit-hypotheses — never a mail-merge. Currents embeds the intent, ranks people by how their current drivers/needs fit it, and composes one grounded fit-claim per person that rides the normal disposal feed.</li>
+        <li id="fn-add-6"><strong>Log a note.</strong> Raw signal into person_raw_inputs — the fuel person-listener extracts from. Search for the person, or it auto-fills after an add.</li>
+        <li id="fn-add-7"><strong>Add asset.</strong> Your own content — value props, writings, talks. The resonator scores these against world-events; outreach-composer cites them. Not derived from the spine — this is the only way to seed them.</li>
+        <li id="fn-add-8"><strong>Asset library.</strong> Your seeded assets, ordered by the resonator's live relevance score. Click “edit” to revise one (re-embeds on save when title/summary/body change).</li>
+      </ol>
     </div>
     </div><!-- /addView -->
 
@@ -547,17 +632,30 @@
       <div id="sugFilter" class="hidden"></div>
       <div class="split">
         <div class="col">
-          <div class="col-h">Pending <span id="sugCount"></span> <button class="ghost mini" id="dispRefresh" style="float:right;margin-top:-3px">refresh</button></div>
+          <div class="col-h">Pending<a class="fnmark" href="#fn-thesis-1">1</a> <span id="sugCount"></span> <button class="ghost mini" id="dispRefresh" style="float:right;margin-top:-3px">refresh</button></div>
           <div class="rail" id="rail"></div>
         </div>
         <div class="col detail" id="detail">
           <p class="empty">Select a thesis to dispose.</p>
         </div>
         <div class="col">
-          <div class="col-h">Why · provenance</div>
+          <div class="col-h">Why · provenance<a class="fnmark" href="#fn-thesis-2">2</a></div>
           <div id="evidence"><p class="empty">—</p></div>
         </div>
       </div>
+    <!-- Day 143 · NEW text, not relocated text: this tab has never carried an explainer,
+         and it is the one tab where the vocabulary is load-bearing (a thesis is the
+         surfaced claim; the hypothesis under it is what calibration actually scores, and
+         24 theses carry no hypothesis at all). Both notes state facts already true of the
+         live system — see CLAUDE.md "Which object is the claim" and the disposal-actions
+         invariant. Cut them if the tab reads better bare. -->
+    <div class="footnotes" id="fnThesis">
+      <div class="fn-lead">Notes</div>
+      <ol>
+        <li id="fn-thesis-1"><strong>Pending theses.</strong> The disposal feed: each row is one surfaced claim awaiting your answer, and answering is what trains the loop. <strong>Accept</strong> spawns a task; <strong>Done</strong> means you already acted and it was right, which counts as a hit and spawns nothing; <strong>Reject</strong> asks for a reason, and only “wrong” debits calibration — the rest route to eligibility, threshold or matching. <strong>Snooze</strong> defers without recording an outcome. The disposal rate <em>is</em> the learning rate.</li>
+        <li id="fn-thesis-2"><strong>Why · provenance.</strong> What the claim rests on: the world-events linked to it, and — for any person subject — the soft-layer grounding behind “◇ see grounding”, which reads their current drivers and needs. Read-only, and raw model confidence is never shown here or anywhere. The band on a claim is empirical, derived from how that generator's past claims resolved.</li>
+      </ol>
+    </div>
     </div><!-- /disposeView -->
 
     <!-- initiativesView removed — the initiative compose/dispatch panels moved into
@@ -565,21 +663,23 @@
 
     <div id="tasksView" class="hidden">
     <div class="panel">
-      <!-- Day 142: "show resolved" moved onto the heading's own flex line rather than
-           floating out of it. A float:right control inside an h2 is positioned against the
-           heading box, so at the old 672px measure it left the frame. -->
-      <h2 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Do Next
+      <!-- Day 143: ONE control line — title · refresh · order · show resolved, all grouped
+           left. Day 142 moved "show resolved" onto the heading line but held it there with
+           margin-left:auto, which parks it against the right edge of a 1080px panel: still
+           inside the box, but a full screen-width away from the heading it belongs to, which
+           reads as gone. The order nav sat on a line of its own below the explainer, so two
+           ways of changing one list were on two different levels. Nothing is pushed apart. -->
+      <h2 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Do Next<a class="fnmark" href="#fn-task-1">1</a>
         <button class="ghost mini" id="tasksRefresh">refresh</button>
-        <label class="asset-filter" style="float:none;margin-left:auto" title="Include completed/abandoned"><input type="checkbox" id="tasksAll"> show resolved</label>
+        <span class="nav" id="taskSortNav" style="margin:0;gap:6px;align-items:center">
+          <span class="hint" style="margin:0 4px 0 6px">order</span>
+          <button data-tsort="recent" class="active" title="Most recently updated first, grouped by stream">Recent</button>
+          <!-- Renamed from "Do next" Day 142: the tab now carries that name, and a sort option
+               sharing it read as a way to get back to the tab you were already on. -->
+          <button data-tsort="donext" title="One ranked list across every stream, oldest-pressing first">Ranked</button>
+        </span>
+        <label class="asset-filter" style="float:none;margin-left:6px" title="Include completed/abandoned"><input type="checkbox" id="tasksAll"> show resolved</label>
       </h2>
-      <p class="hint">Your commitments — a task is spawned when you accept or edit a suggestion. <strong>Complete</strong> / <strong>Abandon</strong> is the outcome signal the loop grades against; <strong>Stall</strong> parks it. Unfiled tasks sit under <strong>Unassigned</strong>.</p>
-      <div class="nav" id="taskSortNav" style="margin-bottom:12px;align-items:center">
-        <span class="hint" style="margin:0 8px 0 0">order</span>
-        <button data-tsort="recent" class="active" title="Most recently updated first, grouped by stream">Recent</button>
-        <!-- Renamed from "Do next" Day 142: the tab now carries that name, and a sort option
-             sharing it read as a way to get back to the tab you were already on. -->
-        <button data-tsort="donext" title="One ranked list across every stream, oldest-pressing first">Ranked</button>
-      </div>
       <!-- Day 139 · bulk filing bar (docs/spec_bulk_task_filing_2026-08-09.md). Hidden until
            at least one task is ticked. No confirm dialog: filing is curation and reversible in
            effect via "detach", and a modal on a curation action trains the operator to dismiss
@@ -594,17 +694,35 @@
       </div>
       <div id="tasksList" style="margin-top:12px"></div>
     </div>
+    <!-- Day 143 · footnotes. Notes 2–4 were the per-group explainers that taskGroupHeader
+         printed between a group's rule and its first card. They are the worst case the
+         footnote pattern is for: three paragraphs of standing definition interleaved with
+         the work itself, re-read on every repaint of a list you visit daily. -->
+    <div class="footnotes" id="fnTasks">
+      <div class="fn-lead">Notes</div>
+      <ol>
+        <li id="fn-task-1"><strong>Do Next.</strong> Your commitments — a task is spawned when you accept or edit a suggestion. <strong>Complete</strong> / <strong>Abandon</strong> is the outcome signal the loop grades against; <strong>Still live</strong> pushes the review date out. Unfiled tasks sit under <strong>Unassigned</strong>.</li>
+        <li id="fn-task-2"><strong>Due for review.</strong> Past their review date. Each wants one of three answers: Complete (did it), Abandon (dropped it), or Still live (neither — push the date out). Renewing is recorded, so declining to close is a signal rather than silence.</li>
+        <li id="fn-task-3"><strong>Ranked.</strong> One ranked list across every stream, oldest-pressing first. Use “Still live” to push a task's review date out.</li>
+        <li id="fn-task-4"><strong>Unassigned.</strong> Standalone tasks, not tied to any stream. Legitimate for one-off relationship maintenance — or file one into a stream with the picker.</li>
+      </ol>
+    </div>
     </div><!-- /tasksView -->
 
     <div id="newsView" class="hidden">
     <div class="panel">
-      <h2>News</h2>
       <!-- Day 142: the tag glossary moved OFF the top of the tab and into the rail footer.
            It was ~90 words of definition standing between the operator and the list every
            single visit, which is the wrong ratio for something you read once and then know.
-           One line of what-this-is stays; the definitions sit under the headlines, where
-           they are reachable at the moment a tag is actually in front of you. -->
-      <p class="hint">The news-fit <strong>gate</strong> — the precision filter that runs <em>before</em> the resonator turns a story into theses, so nothing here writes a calibration signal. <span style="color:var(--ink-faint)">The <strong>Theses</strong> feed is where disposing <em>does</em> write calibration: that's the ground truth, this is the gate. Tags are explained under the list.</span></p>
+           The definitions sit under the headlines, where they are reachable at the moment a
+           tag is actually in front of you. Day 143 took the last paragraph the same way; the
+           glossary STAYS in the rail rather than moving here, because it is read against a
+           tag you are looking at, not read once. -->
+      <h2 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">News<a class="fnmark" href="#fn-news-1">1</a>
+        <!-- Day 143 · the reader D-143 specified and never built. Same toggle idiom as
+             Streams' "+ new" / "merge": a place you open, not a tab you leave News for. -->
+        <button class="ghost mini" id="sourcesToggle" style="margin-left:6px">sources</button>
+      </h2>
       <!-- Day 142: state and sort on ONE row. They were two stacked navs, which read as two
            levels of filtering when they are one list changed two ways. -->
       <div class="nav" id="newsControls" style="margin-bottom:4px;align-items:center;gap:8px">
@@ -621,6 +739,13 @@
           <button data-sort="newest" title="Most recently observed first">Newest</button>
         </span>
       </div>
+      <!-- The sweep list, with what each feed has actually yielded. Collapsed by default:
+           this answers a weekly question ("is this feed earning its place"), not the daily
+           one the tab exists for. -->
+      <div id="sourcesBox" class="hidden">
+        <div id="sourcesBody" style="margin-top:14px"></div>
+        <div class="out" id="sourcesOut" style="margin-top:10px"></div>
+      </div>
     </div>
     <!-- Two-pane reader (Day 141): headlines scan on the left, everything that asks for a
          decision — so-what, provenance, analysis, actions — reads on the right. The old
@@ -634,6 +759,12 @@
       </div>
       <div class="col detail" id="newsDetail"><p class="empty">Select a headline.</p></div>
     </div>
+    <div class="footnotes" id="fnNews">
+      <div class="fn-lead">Notes</div>
+      <ol>
+        <li id="fn-news-1"><strong>News.</strong> The news-fit <strong>gate</strong> — the precision filter that runs <em>before</em> the resonator turns a story into theses, so nothing here writes a calibration signal. The <strong>Theses</strong> feed is where disposing <em>does</em> write calibration: that's the ground truth, this is the gate. What the tags mean is explained under the headline list, where a tag is actually in front of you.</li>
+      </ol>
+    </div>
     </div><!-- /newsView -->
 
     <div id="propositionsView" class="hidden">
@@ -641,7 +772,7 @@
       <!-- Day 141: the three controls sit on the heading line. They were a button plus two
            <summary> rows stacked underneath, which read as three different kinds of thing
            when they are three ways to change the same list. -->
-      <h2 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:0">Streams
+      <h2 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:0">Streams<a class="fnmark" href="#fn-stream-1">1</a>
         <button class="ghost mini" id="propRefresh" style="margin-left:6px">refresh</button>
         <button class="ghost mini" id="propNewToggle">+ new</button>
         <button class="ghost mini" id="propMergeToggle">merge</button>
@@ -680,6 +811,19 @@
         <div class="rail" id="propRail"></div>
       </div>
       <div class="col detail" id="propDetail"><p class="empty">Select a stream or a floating task.</p></div>
+    </div>
+    <!-- Day 143 · NEW text, like the Theses notes. Note 2 is the distinction the Day-141
+         migration header calls load-bearing and the UI has never stated anywhere: `dropped`
+         is withdrawal before a conclusion and is what v_proposition_withdrawal divides by,
+         while `ended` is a real closure. The operator picks between them by one-click
+         buttons that carry only a title attribute. The merge picker's note stays inside the
+         picker: it is read at the moment of choosing parents, not learned once. -->
+    <div class="footnotes" id="fnStreams">
+      <div class="fn-lead">Notes</div>
+      <ol>
+        <li id="fn-stream-1"><strong>Streams.</strong> Durable workspaces — one per product or multi-stakeholder project. A stream holds its stakeholders, its organizations, its tasks and the theses folded into it. Tasks that belong to no stream sit under <strong>Floating tasks</strong> in the same column, because filing one is a move up into the list above it.</li>
+        <li id="fn-stream-2"><strong>Outcome: dropped is not ended.</strong> <em>Ended</em> means the work concluded with neither a win nor a loss. <em>Dropped</em> means you withdrew before it concluded, and that is the one the withdrawal rate counts. The distinction is the point: dropping the claims you have lost faith in improves apparent accuracy without improving judgement, so the two are never merged.</li>
+      </ol>
     </div>
     </div><!-- /propositionsView -->
   </div>
@@ -721,14 +865,45 @@
 
   // Fact/inference grammar (eye slice). The single place a mark is chosen, so a restyle
   // is one edit. Round/square = Spine fact; diamond = Soft inference; fill = calibration.
-  const GLYPH = { person: "g-person", org: "g-org", asset: "g-asset", inf_hollow: "g-inf-0", inf_half: "g-inf-1", inf_full: "g-inf-2" }
-  function markSpan(key, cls) { return '<svg class="gl ' + cls + '"><use href="#' + GLYPH[key] + '"/></svg>' }
+  // Conformed to the commons Day 143. The old keys (inf_hollow / inf_half / inf_full) encoded
+  // CALIBRATION in the fill of a diamond; calibration is now the .pband dots alone, and the
+  // shape carries what kind of object this is plus its commitment state.
+  const GLYPH = {
+    person: "g-person", org: "g-org", asset: "g-asset",
+    thesis: "g-thesis-ring", thesis_accepted: "g-thesis-disc",
+    task: "g-task", task_done: "g-task-done", task_abandoned: "g-task-abandoned",
+    stream: "g-stream", initiative: "g-initiative",
+  }
+  function markSpan(key, cls) {
+    const id = GLYPH[key]
+    // An unknown key used to resolve to `#undefined` and render an invisible <use> — a mark
+    // silently missing rather than obviously wrong. Fail loud in the console instead.
+    if (!id) { console.warn("markSpan: unknown glyph key", key); return "" }
+    return '<svg class="gl ' + cls + '"><use href="#' + id + '"/></svg>'
+  }
   function subjectMark(type) {
     const org = type === "org" || type === "organization"
     return markSpan(org ? "org" : "person", org ? "mk-org" : "mk-person")
   }
-  // Inference diamond by calibration state: grey -> hollow, amber -> half, green -> full.
-  function infMark(state) { return markSpan(state === "green" ? "inf_full" : state === "amber" ? "inf_half" : "inf_hollow", "mk-inf") }
+  // A soft-layer claim, marked by COMMITMENT — not by calibration.
+  //
+  // This used to take a calibration state and vary the diamond's fill by it, which
+  // double-encoded the band: every caller already renders bandHTML() beside the mark, so the
+  // same fact was drawn twice in two notations on one line. Calibration is now the .pband dot
+  // array and nothing else, exactly as D-00X requires.
+  //   working  — the system holds it (ink ring)
+  //   proposed — surfaced to you, awaiting disposal (gold ring)
+  //   accepted — you disposed it in (gold disc)
+  function infMark(commitment) {
+    if (commitment === "accepted") return markSpan("thesis_accepted", "mk-inf")
+    return markSpan("thesis", commitment === "proposed" ? "mk-inf" : "mk-work")
+  }
+  // A task's mark is its lifecycle: pending outcome → outcome → didn't hold.
+  function taskMark(status) {
+    if (status === "completed") return markSpan("task_done", "mk-inf")
+    if (status === "abandoned") return markSpan("task_abandoned", "mk-inf")
+    return markSpan("task", "mk-inf")
+  }
 
   async function api(op, payload) {
     const res = await fetch(API, {
@@ -1198,8 +1373,11 @@
     lead.textContent = matchCount ? "Not who you meant? Add new:" : "Nothing matches — add:"
     host.appendChild(lead)
     const row = document.createElement("div"); row.style.cssText = "display:flex;gap:8px;margin-top:6px;flex-wrap:wrap"
-    row.appendChild(mkBtn("+ person “" + q + "”", "btn-edit", () => prefillAdd("p_name", q)))
-    row.appendChild(mkBtn("+ org “" + q + "”", "btn-edit", () => prefillAdd("o_name", q)))
+    // Day 143: mini, like every other action in the console. No `standoff` — these two sit
+    // in a flex row that already carries its own top margin, so the class would double it.
+    const fmini = (label, fn) => { const b = mkBtn(label, "btn-edit mini", fn); b.style.marginTop = "0"; return b }
+    row.appendChild(fmini("+ person “" + q + "”", () => prefillAdd("p_name", q)))
+    row.appendChild(fmini("+ org “" + q + "”", () => prefillAdd("o_name", q)))
     host.appendChild(row)
   }
   function prefillAdd(fieldId, q) {
@@ -1616,11 +1794,23 @@
   function renderRail() {
     renderReviewBanner()
     renderSugFilter()
-    // Day 142: the ◈ asset-linked filter is gone. `assets` is 0 rows with no producer beyond
-    // the Day-98 add_asset op, so the checkbox filtered a live feed down to nothing and read
-    // as a broken filter rather than an empty library. Its layer is also still unresolved
-    // (CLAUDE.md: neither spine nor soft), so a filter keyed on it was asserting a
-    // classification the estate has not made.
+    // Day 142: the ◈ asset-linked filter is gone.
+    //
+    // CORRECTED Day 143. The original justification here — "`assets` is 0 rows with no producer
+    // beyond the Day-98 add_asset op, so the checkbox filtered a live feed down to nothing" —
+    // was FALSE. Read live 2026-08-11: 18 active assets, and 286 of 5946 hypotheses carry
+    // `asset_id`. The filter had real rows to filter on.
+    //
+    // The count was lifted from CLAUDE.md's Phase-0 note without re-running it, and that file's
+    // own header says not to trust counts baked into it. L141, twice in two days: a negative
+    // reached a file as load-bearing justification without the query that would falsify it.
+    //
+    // The removal still stands, on the ground that survives: the filter answered "which
+    // proposals name an asset", which is a property of the proposal's composition rather than
+    // a reason to dispose of it differently, and it sat as permanent chrome on the disposal
+    // rail for a question asked rarely. That is a UI argument and does not need a row count.
+    // `assets` is now classified — operator material, a third category beside spine and soft
+    // (D-143) — so nothing here rests on an open layer question either.
     const view = SUGS
     $("sugCount").textContent = "· " + SUGS.length
     const host = $("rail")
@@ -1916,21 +2106,25 @@
       ab.appendChild(wrap); d.appendChild(ab)
     }
     const acts = document.createElement("div"); acts.className = "acts"
+    // Day 143: `mini` on every one, matching Streams (Day 141) and Do Next (Day 142). These
+    // were the last full-size action row in the console, and at reading size five buttons
+    // outweighed the claim they act on. One button scale across all three tabs.
+    const dmini = (label, cls, fn) => { const b = mkBtn(label, cls + " mini", fn); b.style.marginTop = "0"; return b }
     // Order: positive commits first (Accept, Done), then non-destructive edits
     // (Amend the wording, Attach to the right person), then defer (Snooze), then the
     // destructive action last (Reject) — reduces misclicks on the negative path.
-    acts.appendChild(mkBtn("Accept", "btn-accept", () => openAccept(id, s)))
+    acts.appendChild(dmini("Accept", "btn-accept", () => openAccept(id, s)))
     // Day 115 Build 2 Slice B: "Done" = already acted and it was TRUE → a hit, not a
     // reject. Counts as confirmed for calibration; spawns no task (already done).
-    acts.appendChild(mkBtn("Done ✓", "btn-accept", () => dispose(id, "done")))
+    acts.appendChild(dmini("Done ✓", "btn-accept", () => dispose(id, "done")))
     // Attach-to-person (currents #4b): re-point this thesis at a person via the
     // existing reattribute path (moves the inference to the person, closes the
     // original as a matching correction). Surfaced directly, not only under reject.
-    acts.appendChild(mkBtn("↪ Attach to person", "btn-edit", () => openReattribute(id)))
-    acts.appendChild(mkBtn("Snooze", "btn-snooze", () => openSnooze(id)))
+    acts.appendChild(dmini("↪ Attach to person", "btn-edit", () => openReattribute(id)))
+    acts.appendChild(dmini("Snooze", "btn-snooze", () => openSnooze(id)))
     // Slice A: Reject opens a reason picker — the code routes the signal (only
     // 'wrong' debits calibration; the rest route to eligibility/threshold/matching).
-    acts.appendChild(mkBtn("Reject…", "btn-reject", () => openReject(id)))
+    acts.appendChild(dmini("Reject…", "btn-reject", () => openReject(id)))
     d.appendChild(acts)
     const slot = document.createElement("div"); slot.id = "inlineSlot"; slot.className = "inline-edit"; d.appendChild(slot)
     const out = document.createElement("div"); out.className = "out"; out.id = "disp_out"; d.appendChild(out)
@@ -2535,8 +2729,7 @@
     const due = tasks.filter(isDue)
     const rest = tasks.filter((t) => !isDue(t))
     if (due.length) {
-      host.appendChild(taskGroupHeader("Due for review · " + due.length,
-        "Past their review date. Each wants one of three answers: Complete (did it), Abandon (dropped it), or Still live (neither \u2014 push the date out). Renewing is recorded, so declining to close is a signal rather than silence."))
+      host.appendChild(taskGroupHeader("Due for review · " + due.length, 2))
       // Most overdue first: the longest-ignored is the one the answer is most owed on.
       for (const t of due.slice().sort((a, b) => new Date(a.review_at) - new Date(b.review_at))) {
         host.appendChild(taskCard(t))
@@ -2546,16 +2739,14 @@
 
     if (TASK_SORT === "donext") {
       const ranked = rest.slice().sort((a, b) => doNextScore(b) - doNextScore(a))
-      host.appendChild(taskGroupHeader("Do next · " + ranked.length,
-        "One ranked list across every stream, oldest-pressing first. Use \u201cStill live\u201d to push a task's review date out."))
+      host.appendChild(taskGroupHeader("Do next · " + ranked.length, 3))
       for (const t of ranked) host.appendChild(taskCard(t))
       return
     }
     const unassigned = rest.filter((t) => !t.proposition_id)
     const assigned = rest.filter((t) => t.proposition_id)
     if (unassigned.length) {
-      host.appendChild(taskGroupHeader("Unassigned · " + unassigned.length,
-        "Standalone tasks, not tied to any stream. Legitimate for one-off relationship maintenance — or file one into a stream with the picker."))
+      host.appendChild(taskGroupHeader("Unassigned · " + unassigned.length, 4))
       for (const t of unassigned) host.appendChild(taskCard(t))
     }
     if (assigned.length) {
@@ -2564,12 +2755,19 @@
     }
   }
 
-  function taskGroupHeader(text, hint) {
+  // Day 143 — the second argument was the group's explainer paragraph, printed between the
+  // rule and the first card. It is now a footnote NUMBER: the marker rides the rule, the
+  // prose lives at the foot of the tab. Pass null for a group that needs no note.
+  function taskGroupHeader(text, fn) {
     const wrap = document.createElement("div")
     const h = document.createElement("div"); h.className = "hint"
     h.style.cssText = "text-transform:uppercase;letter-spacing:.12em;color:var(--ink-faint);margin:18px 0 8px;border-bottom:1px solid var(--line);padding-bottom:4px"
-    h.textContent = text; wrap.appendChild(h)
-    if (hint) { const p = document.createElement("div"); p.className = "hint"; p.style.marginBottom = "8px"; p.textContent = hint; wrap.appendChild(p) }
+    h.textContent = text
+    if (fn) {
+      const a = document.createElement("a"); a.className = "fnmark"; a.href = "#fn-task-" + fn
+      a.textContent = String(fn); h.appendChild(a)
+    }
+    wrap.appendChild(h)
     return wrap
   }
 
@@ -2680,9 +2878,27 @@
   // so a write from it must repaint whichever list the operator is actually looking at.
   // Repainting the hidden one is the bug this replaces: filing a floater left it sitting
   // in the floating section, because only the invisible Tasks tab had been refreshed.
-  function refreshAfterTaskChange() {
-    if (!$("propositionsView").classList.contains("hidden")) loadPropositions()
-    else loadTasks()
+  //
+  // Day 143 — loadPropositions repaints the RAIL and nothing else. On the Streams tab that
+  // left the detail pane rendering the PRE-WRITE task: Abandon wrote the feedback_event,
+  // returned clean, and the card sat there unchanged until the stream was re-clicked —
+  // re-clicking being the only thing that ever called renderPropDetail again. Reported from
+  // the live console; it read as a dead button on the one action with no undo. Every control
+  // on that card had it (Complete, Still live, Edit action, Reframe, the stream picker), so
+  // the repaint belongs here, once, rather than at each call site.
+  async function refreshAfterTaskChange() {
+    if ($("propositionsView").classList.contains("hidden")) { loadTasks(); return }
+    // Capture first: openProposition() clears PROP_TASK_OPEN, and loadPropositions() rebuilds
+    // PROP_FLOATERS underneath us.
+    const pid = PROP_OPEN, tid = PROP_TASK_OPEN
+    await loadPropositions()
+    if (pid) { await openProposition(pid); return }
+    if (!tid) return
+    // A floater that just went terminal (or got filed) has left PROP_FLOATERS, so there is
+    // nothing to re-open. Clear the pane rather than leave a resolved card sitting in it.
+    if (PROP_FLOATERS.some((t) => t.id === tid)) { openFloatingTask(tid); return }
+    PROP_TASK_OPEN = null; paintRailSelection()
+    $("propDetail").innerHTML = '<p class="empty">Task resolved. Select a stream or a floating task.</p>'
   }
 
   async function updateTaskStatus(id, status) {
@@ -2910,6 +3126,10 @@
     life.appendChild(sep)
     const lifeLab = document.createElement("span"); lifeLab.className = "hint"
     lifeLab.style.cssText = "margin:0 4px 0 0;align-self:center"; lifeLab.textContent = "outcome"
+    // The dropped/ended distinction was reachable only by hovering two buttons for their
+    // title attributes. It decides what the withdrawal rate counts, so it gets a note.
+    const lifeFn = document.createElement("a"); lifeFn.className = "fnmark"
+    lifeFn.href = "#fn-stream-2"; lifeFn.textContent = "2"; lifeLab.appendChild(lifeFn)
     life.appendChild(lifeLab)
     // Day 141: `complete` carries an outcome (won|lost|ended), but the operator gets ONE click
     // per outcome rather than a status picker followed by an outcome picker. The sub-status
@@ -2958,7 +3178,12 @@
       order.indexOf(a.stage) - order.indexOf(b.stage) || (a.name || "").localeCompare(b.name || ""))
     for (const s of ranked) host.appendChild(stakeholderRow(p, s))
     const addWrap = document.createElement("div"); addWrap.id = "addStakeWrap"; addWrap.style.marginTop = "10px"
-    addWrap.appendChild(mkBtn("+ add stakeholder", "btn-edit", () => openAddStakeholder(p))); host.appendChild(addWrap)
+    // Day 143: mini, like every other control on this pane. It was the one full-size button
+    // left on the Streams detail, so the quietest act on the page (adding a name) carried the
+    // heaviest control — and it sat directly under a list of 9.5px stage tags.
+    const addBtn = mkBtn("+ add stakeholder", "btn-edit mini", () => openAddStakeholder(p))
+    addBtn.style.marginTop = "0"
+    addWrap.appendChild(addBtn); host.appendChild(addWrap)
 
     // organizations
     host.appendChild(propSection("Organizations"))
@@ -3829,6 +4054,171 @@
   const NEWS_LIMIT = 30
   let NEWS_TOTAL = 0        // how many the window actually held, before the cap
 
+  // ---- Sources (Day 143) — the sweep list, and what each feed has actually yielded ----
+  //
+  // D-143 built every layer of this except the one the operator can see. The panel answers
+  // two questions that were previously unanswerable from the console: which feeds are being
+  // swept, and which of them earn their place.
+  //
+  // The volume-independence rule from D-143 §3 is what the column order encodes: `items` is
+  // volume and must NOT be read as quality, so it sits AFTER mean fit and eligible rate
+  // rather than leading. A feed filing 1545 stories at mean fit 0.2 is worse than one filing
+  // 33 at 0.6, and a table that leads with the count invites exactly the wrong reading.
+  function fmtPct(x) { return x == null ? "—" : Math.round(Number(x) * 100) + "%" }
+  function fmtFit(x) { return x == null ? "—" : Number(x).toFixed(3) }
+  function fmtDay(x) { return x ? String(x).slice(0, 10) : "—" }
+
+  async function loadSources() {
+    const host = $("sourcesBody"); host.innerHTML = '<p class="empty">loading…</p>'
+    try { renderSources(await api("list_sources", {})) }
+    catch (e) { host.innerHTML = ""; show($("sourcesOut"), e.message, false) }
+  }
+
+  function srcCell(text, opts) {
+    const d = document.createElement("div")
+    d.style.cssText = "font-family:'IBM Plex Mono',monospace;font-size:11px;min-width:0;"
+      + "overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+      + (opts && opts.dim ? "color:var(--ink-faint);" : "color:var(--ink-dim);")
+      + (opts && opts.right ? "text-align:right;" : "")
+    d.textContent = text
+    if (opts && opts.title) d.title = opts.title
+    return d
+  }
+
+  const SRC_COLS = "minmax(0,2.2fr) 62px 66px 62px 58px 56px 92px"
+
+  function srcHeadRow() {
+    const r = document.createElement("div")
+    r.style.cssText = "display:grid;grid-template-columns:" + SRC_COLS + ";gap:10px;align-items:center;"
+      + "padding:0 0 6px;border-bottom:1px solid var(--line)"
+    const lbl = (t, right, title) => {
+      const d = document.createElement("div")
+      d.style.cssText = "font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;"
+        + "text-transform:uppercase;color:var(--ink-faint);" + (right ? "text-align:right;" : "")
+      d.textContent = t; if (title) { d.title = title; d.style.cursor = "help" }
+      return d
+    }
+    r.appendChild(lbl("feed"))
+    r.appendChild(lbl("state"))
+    r.appendChild(lbl("mean fit", true, "Average fit score of everything this feed has filed. Volume-independent — this is the quality reading."))
+    r.appendChild(lbl("eligible", true, "Share of this feed's scored items that passed the gate. The other volume-independent half."))
+    r.appendChild(lbl("parked", true, "Auto set-aside as low fit."))
+    r.appendChild(lbl("items", true, "Volume. NOT a quality reading — a firehose scores high here and can still be the worst feed you have."))
+    r.appendChild(lbl("last item", true))
+    return r
+  }
+
+  function renderSources(r) {
+    const host = $("sourcesBody"); host.innerHTML = ""
+    $("sourcesOut").className = "out"
+
+    // The coverage caveat leads, because every number below it is scoped by it. D-143 records
+    // that backfill is impossible: the pre-attribution rows have no recoverable source, so
+    // these readings cover a sliver of the corpus and will for some time. Stating it once at
+    // the top is the difference between "this feed is bad" and "this feed has four items".
+    const c = r.coverage || {}
+    const cov = document.createElement("div"); cov.className = "hint"
+    cov.style.cssText = "margin:0 0 14px;padding:9px 12px;border:1px solid var(--line);"
+      + "border-left:2px solid var(--gold);border-radius:4px;line-height:1.55"
+    const pct = c.events_total ? Math.round((c.events_attributed / c.events_total) * 1000) / 10 : null
+    cov.innerHTML = "<strong style='color:var(--ink-dim)'>" + (c.events_attributed ?? "?") + " of "
+      + (c.events_total ?? "?") + "</strong> stories carry a source"
+      + (pct != null ? " (" + pct + "%)" : "")
+      + (c.attribution_since ? ", from <strong style='color:var(--ink-dim)'>" + fmtDay(c.attribution_since) + "</strong> onward." : ".")
+      + " Everything ingested earlier has no recoverable source and cannot be attributed retroactively,"
+      + " so every figure below describes only the attributed slice."
+    host.appendChild(cov)
+
+    host.appendChild(srcHeadRow())
+    const feeds = r.feeds || []
+    if (!feeds.length) host.appendChild(Object.assign(document.createElement("p"),
+      { className: "empty", textContent: "No subscriptions." }))
+    for (const f of feeds) host.appendChild(srcRow(f))
+
+    // Performance rows with no subscription behind them. The big one is the pre-Day-142
+    // backlog, which is NOT a source — the view's own comment says to read it as a backlog —
+    // so it is listed apart from the sweep list rather than as a sixth feed.
+    const un = r.unmatched || []
+    if (un.length) {
+      const h = document.createElement("div"); h.className = "hint"
+      h.style.cssText = "text-transform:uppercase;letter-spacing:.12em;color:var(--ink-faint);"
+        + "margin:20px 0 4px;border-bottom:1px solid var(--line);padding-bottom:4px"
+      h.textContent = "Not a source · " + un.length
+      host.appendChild(h)
+      const note = document.createElement("div"); note.className = "hint"
+      note.style.margin = "0 0 8px"
+      note.textContent = "Stories with no feed behind them: the pre-attribution backlog, and any "
+        + "ingest that did not come from the sweep. Read as a bucket, not as a feed."
+      host.appendChild(note)
+      for (const u of un) {
+        const row = document.createElement("div")
+        row.style.cssText = "display:grid;grid-template-columns:" + SRC_COLS + ";gap:10px;"
+          + "align-items:center;padding:7px 0;border-bottom:1px solid var(--line);opacity:.72"
+        row.appendChild(srcCell(u.source_label || "unattributed", { dim: true }))
+        row.appendChild(srcCell("—", { dim: true }))
+        row.appendChild(srcCell(fmtFit(u.mean_fit), { right: true, dim: true }))
+        row.appendChild(srcCell(fmtPct(u.eligible_rate), { right: true, dim: true }))
+        row.appendChild(srcCell(u.parked == null ? "—" : String(u.parked), { right: true, dim: true }))
+        row.appendChild(srcCell(u.items == null ? "—" : String(u.items), { right: true, dim: true }))
+        row.appendChild(srcCell(fmtDay(u.last_item_at), { right: true, dim: true }))
+        host.appendChild(row)
+      }
+    }
+  }
+
+  function srcRow(f) {
+    const row = document.createElement("div")
+    row.style.cssText = "display:grid;grid-template-columns:" + SRC_COLS + ";gap:10px;"
+      + "align-items:center;padding:8px 0;border-bottom:1px solid var(--line)"
+      + (f.enabled ? "" : ";opacity:.55")
+
+    const name = document.createElement("div"); name.style.minWidth = "0"
+    const t = document.createElement("div")
+    t.style.cssText = "font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+    t.textContent = f.label; t.title = f.ref
+    name.appendChild(t)
+    name.appendChild(srcCell(f.kind + " · " + f.ref, { dim: true, title: f.ref }))
+    row.appendChild(name)
+
+    // One click flips it. Same grammar as the stakeholder stage tags: the control states the
+    // CURRENT value and clicking it changes that value, rather than being a verb you read as
+    // an instruction ("disable") and mistake for the state.
+    const tog = document.createElement("button")
+    tog.textContent = f.enabled ? "on" : "off"
+    tog.style.cssText = "font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.08em;"
+      + "text-transform:uppercase;padding:2px 10px;border-radius:10px;margin:0;"
+      + "border:1px solid " + (f.enabled ? "var(--green)" : "var(--ink-faint)") + ";"
+      + (f.enabled ? "background:var(--green);color:var(--bg)" : "background:transparent;color:var(--ink-faint)")
+    tog.title = f.enabled
+      ? "Swept every 4h. Click to stop sweeping this feed — its past stories stay attributed."
+      : "Not swept. Click to start sweeping it again."
+    tog.addEventListener("click", () => toggleFeed(f, tog))
+    row.appendChild(tog)
+
+    row.appendChild(srcCell(fmtFit(f.mean_fit), { right: true }))
+    row.appendChild(srcCell(fmtPct(f.eligible_rate), { right: true }))
+    row.appendChild(srcCell(f.parked == null ? "—" : String(f.parked), { right: true, dim: true }))
+    row.appendChild(srcCell(f.items == null ? "—" : String(f.items), { right: true, dim: true }))
+    row.appendChild(srcCell(fmtDay(f.last_item_at), { right: true, dim: true }))
+    return row
+  }
+
+  async function toggleFeed(f, btn) {
+    const next = !f.enabled
+    btn.disabled = true; btn.textContent = "…"
+    try {
+      await api("set_feed_enabled", { feed_id: f.id, enabled: next })
+      // Reload rather than patch the row in place: `enabled` is the sort key, so a flipped
+      // feed belongs in a different position, and leaving it where it was would make the
+      // list disagree with its own ordering until the next open.
+      await loadSources()
+      show($("sourcesOut"), f.label + (next ? " will be swept again." : " is no longer swept. Its past stories stay attributed."), true)
+    } catch (e) {
+      btn.disabled = false; btn.textContent = f.enabled ? "on" : "off"
+      show($("sourcesOut"), e.message, false)
+    }
+  }
+
   async function loadNews() {
     const host = $("newsRail"); host.innerHTML = '<p class="empty">loading…</p>'
     try {
@@ -3939,6 +4329,13 @@
       // which feed filed a story is part of that judgement.
       + ' <span class="src" style="color:var(--ink-faint)" title="' + esc(it.source_label || "unattributed") + '">'
         + esc(it.source_label || "unattributed") + "</span>"
+      // D-143: which stream this speaks to. Gold because it is an inference about your work,
+      // not a fact about the story — and advisory only: it never affected whether this is here.
+      + (it.stream_title
+        ? ' <span class="src" style="color:var(--gold)" title="Speaks to the stream “'
+          + esc(it.stream_title) + '” — advisory, it did not affect the gate">→ '
+          + esc(it.stream_title) + "</span>"
+        : "")
       + (newsActioned(it)
         ? ' <span style="color:var(--green)">' + (it.has_thesis ? "→ thesis" : it.hypothesis_count + " theses") + "</span>"
         : "")
@@ -3966,6 +4363,18 @@
       (it.fit_score == null ? null : "fit " + Number(it.fit_score).toFixed(3))].filter(Boolean).join(" · ")
     if (src === "unattributed") head.title = "Ingested before provenance was recorded (2026-08-11). The source cannot be recovered."
     d.appendChild(head)
+
+    // D-143 · the stream this speaks to. Stated as an observation, not a control: it did not
+    // decide whether this story is in front of you (the gate is fit alone), and the raw cosine
+    // is deliberately NOT shown — it is a similarity, not a confidence, and the estate's rule
+    // is that raw model numbers are never displayed.
+    if (it.stream_title) {
+      const sl = document.createElement("div")
+      sl.style.cssText = "margin:6px 0 0;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--gold)"
+      sl.textContent = "→ speaks to " + it.stream_title
+      sl.title = "Best-matching active stream. Advisory — it did not affect whether this story flowed."
+      d.appendChild(sl)
+    }
 
     const st = document.createElement("span"); st.textContent = it.fit_state
     st.title = NEWS_STATE_TIP[it.fit_state] || ""
@@ -4149,6 +4558,29 @@
     $("taskSortNav").querySelectorAll("button").forEach((x) => x.classList.toggle("active", x === b))
     renderTasks(TASKS_CACHE)
   }))
+  // Day 143 · footnote markers. Delegated on the document, because most of them are minted
+  // by a renderer (task group rules, the Streams outcome row) long after this runs — binding
+  // per-marker would cover only the ones that exist at load and silently miss the rest.
+  // preventDefault: a bare #hash jump also writes history, so the browser Back button would
+  // start undoing footnote clicks instead of leaving the console.
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest && e.target.closest("a.fnmark")
+    if (!a) return
+    e.preventDefault()
+    const li = document.querySelector(a.getAttribute("href"))
+    if (!li) return
+    li.scrollIntoView({ behavior: "smooth", block: "center" })
+    // Eight identical grey lines look the same on arrival; lift the one you asked for.
+    for (const x of document.querySelectorAll(".footnotes li.fn-hit")) x.classList.remove("fn-hit")
+    li.classList.add("fn-hit")
+  })
+  // Day 143 · sources panel. Loads on first open, not on tab entry: it answers a weekly
+  // question, and fetching it on every News visit would put four queries behind the daily one.
+  $("sourcesToggle").addEventListener("click", () => {
+    const box = $("sourcesBox"), open = box.classList.toggle("hidden") === false
+    $("sourcesToggle").classList.toggle("active", open)
+    if (open) loadSources()
+  })
   $("navPropositions").addEventListener("click", showPropositions)
   $("navNews").addEventListener("click", showNews)
   initNewsStateNav()
