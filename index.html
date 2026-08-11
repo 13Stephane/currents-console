@@ -80,6 +80,14 @@
     color: var(--ink); border-radius: 3px; padding: 10px 12px; font-size: 15px;
     font-family: Georgia, serif;
   }
+  /* Day 143 · checkboxes and radios are NOT text fields. The rule above sets width:100% and
+     10px padding on every `input`, which stretched every checkbox in the console into a large
+     empty box and shoved its label away from it. `.mg-pick input { width:auto }` had already
+     patched this in one place; the bug was the global rule, so the fix belongs here. */
+  input[type="checkbox"], input[type="radio"] {
+    width: auto; padding: 0; margin: 0; flex: 0 0 auto;
+    accent-color: var(--gold); cursor: pointer;
+  }
   input:focus, textarea:focus, select:focus { outline: none; border-color: var(--gold); }
   textarea { resize: vertical; min-height: 68px; line-height: 1.45; }
   /* Control grammar (Day 141): shape carries meaning, so a tab and a button must not
@@ -109,9 +117,35 @@
   .pending-card { border: 1px dashed var(--line); border-radius: 3px; padding: 15px 16px;
     margin-top: 12px; background: rgba(21,52,55,.5); }
   .pending-card .who { font-family: "IBM Plex Mono", monospace; font-size: 13px; }
+  /* Day 143 · a task's action is PROSE and takes the prose face.
+     The console's register is: serif = the operator's material, mono = the system's machinery
+     (labels, metadata, hints, controls). `.pending-card .who` is mono because on the disposal
+     feed it holds a NAME — a short identifier, correctly mono. taskCard reuses the card and
+     puts a full sentence there, so a task's action was a sentence set in an identifier face,
+     while a News headline one tab over was serif. Matched to .rclaim, which is the same kind
+     of object: the one line you scan a list by. */
+  .pending-card.tcard .who { font-family: Georgia, "Times New Roman", serif;
+    font-size: 14.5px; line-height: 1.45; letter-spacing: 0; }
+  /* The per-task stream picker is an inline control on an action row, not a form field, so it
+     sizes to its content instead of inheriting the global `select { width: 100% }`. Full-width
+     made a two-word stream name span the whole card and read as the card's primary input. */
+  .pending-card .acts select { width: auto; max-width: 260px; }
   .pending-card .cand { display: flex; gap: 9px; align-items: center; margin-top: 7px; font-size: 14px; color: var(--ink-dim); }
   .hint { color: var(--ink-faint); font-size: 12px; font-family: "IBM Plex Mono", monospace; line-height: 1.5; }
-  .hidden { display: none; }
+  /* `.hidden` must be able to beat a layout rule, so layout belongs in a class, never inline.
+     !important is the belt to the .selbar braces: this class is the console's single hide
+     mechanism and every future inline `display:` would silently defeat it otherwise. */
+  .hidden { display: none !important; }
+  /* Bulk-filing selection bar (Day 139), layout moved off the element Day 143. */
+  .selbar { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--gold);
+    border-radius: 6px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .selbar select { width: auto; min-width: 220px; }
+  /* Reassign mode (Day 143): a card becomes a target, and says so by taking the SAME gold edge
+     a selected rail item takes — one selection language across the console, not two. */
+  .tcard.selectable { cursor: pointer; }
+  .tcard.selectable:hover { border-color: var(--gold); }
+  .tcard.sel { border-style: solid; border-color: var(--gold);
+    box-shadow: inset 3px 0 0 var(--gold); background: rgba(198,165,83,.07); }
   .mini { margin: 0; padding: 4px 10px; font-size: 11px; }
   /* Day 143 — a panel's submit button at the mini scale, which is now the console's only
      button scale. `.mini` alone is not enough here: it zeroes the margin, because it was
@@ -125,11 +159,43 @@
   /* A tab is a PLACE, not an act (see the button rule above): no enclosing box, just a
      rule above and below, and a filled gold rectangle when you are standing in it. The
      square corners are load-bearing — they are what separates it from a pill action. */
+  /* Day 143 · sized up from 12px/.1em.
+     FACE stays mono, deliberately. The console's register is serif = the operator's material,
+     mono = the system's machinery; navigation is machinery. Shape already separates a tab from
+     a button (square vs pill), so changing the face too would over-signal.
+     SIZE was the actual fault, and it was a hierarchy inversion: the primary navigation of the
+     whole application sat at 12px — the same size as `.hint`, the least important text on the
+     page, and one pixel above the smallest button. Tracking made it worse: generous
+     letter-spacing is a small-type device, so 12px + .1em read as a caption rather than a
+     destination. 14px outranks the hints and sits just under body prose; .06em because larger
+     type needs less tracking to hold together. */
   .nav button {
     margin-top: 0; background: transparent; color: var(--ink-dim); font-weight: 500;
     letter-spacing: .1em; border-radius: 0;
     border: 1px solid transparent; border-top-color: var(--line); border-bottom-color: var(--line);
   }
+  /* Scoped to the PRIMARY nav only. `.nav` is reused by the News state/sort row and the task
+     sort row, which are secondary filters and must stay quieter than the destinations — an
+     unscoped bump would have set a filter at the same weight as a whole tab. */
+  #mainNav button { font-size: 14px; letter-spacing: .06em; padding: 9px 20px; }
+  /* Day 143 · secondary filters (News state + sort, Do Next order).
+     They were `.nav` buttons, which meant the ACTIVE one took the same gold-filled block as a
+     primary tab. On News that put TWO filled blocks — "Eligible" and "Balanced" — on the
+     screen, both of them the defaults you keep almost all the time. The loudest marks on the
+     tab were the two settings you never change, competing with the tab bar above them.
+     A filter is not a place. Active here is stated with weight and a gold underline, not a
+     fill: the fill stays reserved for "you are standing in this view". */
+  .nav.subnav button {
+    font-size: 11px; letter-spacing: .1em; padding: 5px 10px; margin-top: 0;
+    background: transparent; color: var(--ink-faint); font-weight: 400;
+    border: none; border-bottom: 1px solid transparent; border-radius: 0;
+  }
+  .nav.subnav button:hover { color: var(--ink-dim); border-bottom-color: var(--line); }
+  .nav.subnav button.active {
+    background: transparent; color: var(--gold); font-weight: 500;
+    border-bottom-color: var(--gold);
+  }
+  .nav.subnav .hint { font-size: 10px; }
   .nav button:hover { color: var(--ink); border-top-color: var(--gold); border-bottom-color: var(--gold); }
   .nav button.active { background: var(--gold); color: var(--bg); border-color: var(--gold); }
   .split { display: grid; grid-template-columns: 312px minmax(0,1fr) 290px; gap: 18px; align-items: start; }
@@ -427,7 +493,7 @@
            This comment deliberately does NOT repeat the token: the script's first real run
            replaced it here as well as below, and its own 2-line guard caught the double
            substitution. Any second copy of that literal in this file breaks publishing. -->
-      <span class="build">build 6f2b51c+dirty · 2026-08-11</span>
+      <span class="build">build eff9494 · 2026-08-11</span>
     </span>
   </div>
 
@@ -446,7 +512,7 @@
   <div id="app" class="hidden">
     <!-- Left-to-right = the review flow (News → Theses → Propositions → Tasks); the
          create/act hub (Find/add, which now also declares initiatives) sits to the right. -->
-    <div class="nav">
+    <div class="nav" id="mainNav">
       <button id="navNews">News</button>
       <button id="navDispose" class="active">Theses</button>
       <button id="navPropositions">Streams</button>
@@ -726,20 +792,52 @@
            ways of changing one list were on two different levels. Nothing is pushed apart. -->
       <h2 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Do Next<a class="fnmark" href="#fn-task-1">1</a>
         <button class="ghost mini" id="tasksRefresh">refresh</button>
-        <span class="nav" id="taskSortNav" style="margin:0;gap:6px;align-items:center">
+        <span class="nav subnav" id="taskSortNav" style="margin:0;gap:6px;align-items:center">
           <span class="hint" style="margin:0 4px 0 6px">order</span>
           <button data-tsort="recent" class="active" title="Most recently updated first, grouped by stream">Recent</button>
           <!-- Renamed from "Do next" Day 142: the tab now carries that name, and a sort option
                sharing it read as a way to get back to the tab you were already on. -->
           <button data-tsort="donext" title="One ranked list across every stream, oldest-pressing first">Ranked</button>
         </span>
-        <label class="asset-filter" style="float:none;margin-left:6px" title="Include completed/abandoned"><input type="checkbox" id="tasksAll"> show resolved</label>
+        <!-- Day 143: was a checkbox, which the global `input` rule stretched into a large empty
+             box with its label pushed away from it. It is also not a form field — it changes
+             what the list shows, exactly like the Recent/Ranked toggles below, so it takes the
+             same control: a ghost pill that reads as pressed while active. -->
+        <button class="ghost mini" id="tasksAll" aria-pressed="false"
+                title="Include completed and abandoned tasks">show resolved</button>
+        <!-- Day 143 · reassignment is a MODE, entered deliberately.
+             The checkboxes used to sit on every card permanently, which put a bulk-editing
+             control on a list whose normal use is reading and disposing one task at a time.
+             Off, a card is just a card. On, clicking a card selects it. -->
+        <button class="ghost mini" id="tasksReassign" aria-pressed="false"
+                title="Select tasks by clicking them, then file them into a stream">reassign</button>
+        <button class="ghost mini" id="taskNewToggle" title="Write a task yourself">+ task</button>
       </h2>
-      <!-- Day 139 · bulk filing bar (docs/spec_bulk_task_filing_2026-08-09.md). Hidden until
-           at least one task is ticked. No confirm dialog: filing is curation and reversible in
-           effect via "detach", and a modal on a curation action trains the operator to dismiss
-           modals. -->
-      <div id="taskSelBar" class="hidden" style="margin-top:12px;padding:10px 12px;border:1px solid var(--gold);border-radius:6px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+      <!-- Operator-authored task. No thesis, no news, no model claim behind it — so nothing to
+           calibrate and correctly no suggestion. See the footnote on where tasks come from. -->
+      <div id="taskNewBox" class="hidden inline-edit" style="margin-bottom:14px">
+        <label>What needs doing?</label>
+        <textarea id="tk_action" rows="2" placeholder="Call Ada about the Q4 scanning pilot…"></textarea>
+        <label>Stream (optional)</label>
+        <select id="tk_prop"></select>
+        <label>Review in (days)</label>
+        <input id="tk_days" type="number" min="1" max="365" value="14">
+        <div class="acts">
+          <button class="mini" id="tk_createBtn">Add task</button>
+          <button class="ghost mini" id="tk_cancelBtn">cancel</button>
+        </div>
+        <div class="out" id="tk_out"></div>
+      </div>
+      <!-- Day 139 · bulk filing bar (docs/spec_bulk_task_filing_2026-08-09.md). Shown only in
+           reassign mode with at least one task selected (Day 143). No confirm dialog: filing is
+           curation and reversible in effect via "detach", and a modal on a curation action
+           trains the operator to dismiss modals. -->
+      <!-- Day 143 · the `display:flex` that used to sit in this element's INLINE style beat
+           `.hidden { display: none }` from the stylesheet, so this bar has been visible since
+           it shipped on Day 139 — permanently, with an empty picker and a File button, whether
+           or not anything was selected. That is the "what is this blank 'file into' field?"
+           the operator reported. The layout moved into .selbar so the class can win. -->
+      <div id="taskSelBar" class="hidden selbar">
         <strong id="taskSelCount" style="color:var(--gold)"></strong>
         <span class="hint" style="margin:0">file into</span>
         <select id="taskSelTarget" style="font-size:12px;padding:3px 6px"></select>
@@ -780,7 +878,7 @@
       </h2>
       <!-- Day 142: state and sort on ONE row. They were two stacked navs, which read as two
            levels of filtering when they are one list changed two ways. -->
-      <div class="nav" id="newsControls" style="margin-bottom:4px;align-items:center;gap:8px">
+      <div class="nav subnav" id="newsControls" style="margin-bottom:4px;align-items:center;gap:8px">
         <span id="newsStateNav" style="display:contents">
           <button data-state="eligible" class="active">Eligible</button>
           <button data-state="held">Held</button>
@@ -2688,13 +2786,20 @@
   // with no filters at all, so a "file everything in this view" action would have meant building
   // filter infrastructure first to serve a pool of six. Revisit past ~30 unassigned.
   const TASK_SEL = new Set()
+  // Day 143: reassignment is a mode, not a permanent affordance. Session state, deliberately
+  // not persisted — the useful default on every visit is "I am here to answer tasks", not
+  // "I am here to reorganise them".
+  let REASSIGN_MODE = false
 
   async function loadTasks() {
     const host = $("tasksList"); host.textContent = "loading…"
     // Selection does not survive a reload: the ids would still resolve, but the operator's
     // mental picture of "what is ticked" would not, and bulk filing ships with no undo.
     TASK_SEL.clear()
-    const all = $("tasksAll") && $("tasksAll").checked
+    // Day 143: a toggle button rather than a checkbox, so the pressed state IS the state —
+    // read from aria-pressed, which is also what assistive tech reads, rather than from a
+    // parallel JS flag that could drift from what the button looks like.
+    const all = $("tasksAll") && $("tasksAll").getAttribute("aria-pressed") === "true"
     try {
       // "Show resolved" lists EVERY status the CHECK admits, including the two nothing writes
       // any more (`stalled`, retired Day 141) and the one nothing writes yet (`released`,
@@ -2745,7 +2850,9 @@
   function renderTaskSelBar() {
     const bar = $("taskSelBar")
     if (!bar) return
-    const n = TASK_SEL.size
+    // Gated on the mode as well as the count: leaving reassign mode must take the bar with it,
+    // not leave a filing control over a list that no longer has selectable cards.
+    const n = REASSIGN_MODE ? TASK_SEL.size : 0
     bar.classList.toggle("hidden", n === 0)
     if (!n) return
     $("taskSelCount").textContent = n + (n === 1 ? " task selected" : " tasks selected")
@@ -2765,6 +2872,44 @@
   // Day-120 single-task call precisely because bulk filing has no undo (spec D1/D3) — a batch
   // that half-applied would leave a state with no recovery path, since `tasks` keeps no history
   // of the previous proposition_id.
+  // Day 143 · the operator writes a task directly.
+  //
+  // Every task in the estate until now was born one of two ways — `created_from='accepted'`
+  // (58, from disposing a thesis in) or `'restructure'` (17, from the Day-140 LLM pass). There
+  // was no way to write one yourself, so work that did not originate in a system proposal had
+  // nowhere to live. This is `created_from='manual'`, and it correctly has NO suggestion and
+  // NO task_source: there is no model claim behind it, so there is nothing to calibrate.
+  function fillTaskPropSelect() {
+    const sel = $("tk_prop"); sel.innerHTML = ""
+    const none = document.createElement("option")
+    none.value = ""; none.textContent = "— standalone (no stream) —"
+    sel.appendChild(none)
+    for (const p of TASK_PROPS) {
+      if (p.status === "dropped" || p.status === "archived") continue
+      const o = document.createElement("option"); o.value = p.id; o.textContent = p.title
+      sel.appendChild(o)
+    }
+  }
+  async function createTask() {
+    const action = $("tk_action").value.trim()
+    const out = $("tk_out")
+    if (!action) { show(out, "A task needs an action.", false); return }
+    const days = Math.max(1, Math.min(365, Number($("tk_days").value) || 14))
+    $("tk_createBtn").disabled = true
+    try {
+      await api("add_task", {
+        current_action: action,
+        proposition_id: $("tk_prop").value || null,
+        review_days: days,
+      })
+      $("tk_action").value = ""
+      $("taskNewBox").classList.add("hidden"); $("taskNewToggle").classList.remove("active")
+      out.textContent = ""
+      await loadTasks()
+    } catch (e) { show(out, e.message, false) }
+    finally { $("tk_createBtn").disabled = false }
+  }
+
   async function bulkFileTasks() {
     const ids = [...TASK_SEL]
     if (!ids.length) return
@@ -2847,25 +2992,29 @@
   // tab's selection bar, and a checkbox with no bar to report to is a control that does nothing.
   function taskCard(t, opts) {
     const bulk = !opts || opts.bulk !== false
-    const card = document.createElement("div"); card.className = "pending-card"
+    // `tcard` marks this as a TASK card rather than a disposal card. Both share pending-card's
+    // box; only the task's head carries prose, so only it takes the serif (see the CSS).
+    const card = document.createElement("div"); card.className = "pending-card tcard"
 
     const head = document.createElement("div"); head.className = "who"
-    // Day 139 — bulk filing (docs/spec_bulk_task_filing_2026-08-09.md). Selection checkbox on
-    // non-terminal tasks only, matching the action row below: a completed task has nowhere to
-    // be filed to that matters. Same mg-cb idiom as the merge composer so the console has one
-    // multi-select pattern rather than two.
-    if (bulk && t.status === "open") {
-      const cb = document.createElement("input")
-      cb.type = "checkbox"; cb.className = "mg-cb"; cb.value = t.id
-      cb.style.cssText = "margin-right:8px;vertical-align:middle"
-      cb.title = "Select for bulk filing"
-      cb.checked = TASK_SEL.has(t.id)
-      cb.addEventListener("click", (e) => e.stopPropagation())
-      cb.addEventListener("change", () => {
-        if (cb.checked) TASK_SEL.add(t.id); else TASK_SEL.delete(t.id)
+    // Day 143 · selection is CLICKING THE CARD, in reassign mode only.
+    //
+    // Was a checkbox on every open task, permanently — a bulk-editing control living on a list
+    // whose normal use is reading one task and answering it. The checkbox also had to be aimed
+    // at, on a card whose whole surface was already inert. Now the card IS the target, and it
+    // says it is selected by taking the same gold edge a selected rail item takes, so the
+    // console has one "this row is selected" language instead of two.
+    if (bulk && REASSIGN_MODE && t.status === "open") {
+      card.classList.add("selectable")
+      if (TASK_SEL.has(t.id)) card.classList.add("sel")
+      card.addEventListener("click", (e) => {
+        // Buttons, pickers and the inline editors live inside the card and must keep working:
+        // only a click on the card's own surface toggles selection.
+        if (e.target.closest("button, select, input, textarea, a, .inline-edit")) return
+        if (TASK_SEL.has(t.id)) { TASK_SEL.delete(t.id); card.classList.remove("sel") }
+        else { TASK_SEL.add(t.id); card.classList.add("sel") }
         renderTaskSelBar()
       })
-      head.appendChild(cb)
     }
     // Day 143 · the task's own mark, carrying its lifecycle: a gold square outline that fills
     // into the commons' `outcome` glyph on completion, and goes dashed if it did not hold.
@@ -4662,7 +4811,32 @@
   $("initListRefresh").addEventListener("click", loadInitiatives)
   $("navTasks").addEventListener("click", showTasks)
   $("tasksRefresh").addEventListener("click", loadTasks)
-  $("tasksAll").addEventListener("change", loadTasks)
+  $("tasksAll").addEventListener("click", () => {
+    const b = $("tasksAll"), on = b.getAttribute("aria-pressed") !== "true"
+    b.setAttribute("aria-pressed", String(on))
+    b.classList.toggle("active", on)   // .ghost.active is the console's existing pressed look
+    loadTasks()
+  })
+  // Entering reassign mode makes cards selectable; LEAVING it clears the selection, because a
+  // selection you can no longer see is a selection you can still act on by accident.
+  $("tasksReassign").addEventListener("click", () => {
+    const b = $("tasksReassign")
+    REASSIGN_MODE = !REASSIGN_MODE
+    b.setAttribute("aria-pressed", String(REASSIGN_MODE))
+    b.classList.toggle("active", REASSIGN_MODE)
+    if (!REASSIGN_MODE) TASK_SEL.clear()
+    renderTasks(TASKS_CACHE)
+  })
+  $("taskNewToggle").addEventListener("click", () => {
+    const box = $("taskNewBox"), opening = box.classList.contains("hidden")
+    box.classList.toggle("hidden", !opening)
+    $("taskNewToggle").classList.toggle("active", opening)
+    if (opening) { fillTaskPropSelect(); $("tk_action").focus() }
+  })
+  $("tk_cancelBtn").addEventListener("click", () => {
+    $("taskNewBox").classList.add("hidden"); $("taskNewToggle").classList.remove("active")
+  })
+  $("tk_createBtn").addEventListener("click", createTask)
   // Day 139 · bulk filing
   $("taskSelApply").addEventListener("click", bulkFileTasks)
   $("taskSelClear").addEventListener("click", () => { TASK_SEL.clear(); renderTasks(TASKS_CACHE) })
