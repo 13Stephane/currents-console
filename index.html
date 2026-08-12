@@ -493,7 +493,7 @@
            This comment deliberately does NOT repeat the token: the script's first real run
            replaced it here as well as below, and its own 2-line guard caught the double
            substitution. Any second copy of that literal in this file breaks publishing. -->
-      <span class="build">build eff9494 · 2026-08-11</span>
+      <span class="build">build 8deab5f · 2026-08-12</span>
     </span>
   </div>
 
@@ -773,7 +773,7 @@
     <div class="footnotes" id="fnThesis">
       <div class="fn-lead">Notes</div>
       <ol>
-        <li id="fn-thesis-1"><strong>Pending theses.</strong> The disposal feed: each row is one surfaced claim awaiting your answer, and answering is what trains the loop. <strong>Accept</strong> spawns a task; <strong>Done</strong> means you already acted and it was right, which counts as a hit and spawns nothing; <strong>Reject</strong> asks for a reason, and only “wrong” debits calibration — the rest route to eligibility, threshold or matching. <strong>Snooze</strong> defers without recording an outcome. The disposal rate <em>is</em> the learning rate.</li>
+        <li id="fn-thesis-1"><strong>Pending theses.</strong> The disposal feed: each row is one surfaced claim awaiting your answer, and answering is what trains the loop. <strong>Accept</strong> records a hit and spawns a task when you name the work; <strong>Reject</strong> asks for a reason, and only “wrong” debits calibration — the rest route to eligibility, threshold or matching. <strong>Snooze</strong> defers without recording an outcome. The disposal rate <em>is</em> the learning rate.</li>
         <li id="fn-thesis-2"><strong>Why · provenance.</strong> What the claim rests on: the world-events linked to it, and — for any person subject — the soft-layer grounding behind “◇ see grounding”, which reads their current drivers and needs. Read-only, and raw model confidence is never shown here or anywhere. The band on a claim is empirical, derived from how that generator's past claims resolved.</li>
       </ol>
     </div>
@@ -2273,13 +2273,15 @@
     // were the last full-size action row in the console, and at reading size five buttons
     // outweighed the claim they act on. One button scale across all three tabs.
     const dmini = (label, cls, fn) => { const b = mkBtn(label, cls + " mini", fn); b.style.marginTop = "0"; return b }
-    // Order: positive commits first (Accept, Done), then non-destructive edits
-    // (Amend the wording, Attach to the right person), then defer (Snooze), then the
+    // Order: positive commit first (Accept), then non-destructive edits
+    // (Attach to the right person), then defer (Snooze), then the
     // destructive action last (Reject) — reduces misclicks on the negative path.
+    // Day 144: "Done ✓" (Day 115 Slice B — already acted, a hit, spawns no task) removed
+    // by the amended test: 2 uses in five months against 78 accepts. The server still
+    // takes 'done'; what the button uniquely offered (a hit WITHOUT a task on a
+    // hypothesis-backed thesis, whose blank accept falls back to suggested_action)
+    // goes with it, knowingly.
     acts.appendChild(dmini("Accept", "btn-accept", () => openAccept(id, s)))
-    // Day 115 Build 2 Slice B: "Done" = already acted and it was TRUE → a hit, not a
-    // reject. Counts as confirmed for calibration; spawns no task (already done).
-    acts.appendChild(dmini("Done ✓", "btn-accept", () => dispose(id, "done")))
     // Attach-to-person (currents #4b): re-point this thesis at a person via the
     // existing reattribute path (moves the inference to the person, closes the
     // original as a matching correction). Surfaced directly, not only under reject.
@@ -2456,6 +2458,8 @@
     slot.appendChild(ta)
     const hint = document.createElement("div"); hint.className = "hint"
     hint.textContent = "reprocessed when learning why theses get rejected"; slot.appendChild(hint)
+    // Day 144: second-stage buttons take the same mini scale as the action row that
+    // opened them — a follow-up question must not shout louder than the act itself.
     const row = document.createElement("div"); row.className = "acts"; row.style.marginTop = "8px"
     const codes = [
       ["Wrong", "wrong", "false / bad inference → calibration (debits the curve)"],
@@ -2465,13 +2469,13 @@
       ["Off my positioning", "off_positioning", "true, but not mine to speak to / off my thesis → positioning gate (NOT calibration)"],
     ]
     for (const [label, code, tip] of codes) {
-      const b = mkBtn(label, "btn-reject", () => dispose(id, "rejected", { reason_code: code, comment: (ta.value || "").trim() || null }))
+      const b = mkBtn(label, "btn-reject mini", () => dispose(id, "rejected", { reason_code: code, comment: (ta.value || "").trim() || null }))
       b.title = tip
       row.appendChild(b)
     }
     slot.appendChild(row)
     // Slice C: on wrong_person, offer to reattribute to the correct subject.
-    const rea = mkBtn("↪ Reattribute to correct person", "btn-edit", () => openReattribute(id))
+    const rea = mkBtn("↪ Reattribute to correct person", "btn-edit mini", () => openReattribute(id))
     rea.style.marginTop = "10px"; slot.appendChild(rea)
   }
 
@@ -2494,7 +2498,7 @@
           for (const p of (r.people || [])) {
             const row = document.createElement("div"); row.className = "cand"
             const name = p.full_name + (p.org ? " · " + p.org : "") + (p.location ? " · " + p.location : "")
-            const b = mkBtn("↪ " + name, "btn-edit", () => reattribute(id, p.id, p.full_name))
+            const b = mkBtn("↪ " + name, "btn-edit mini", () => reattribute(id, p.id, p.full_name))
             b.style.textAlign = "left"; row.appendChild(b); results.appendChild(row)
           }
           if (!(r.people || []).length) results.innerHTML = '<p class="empty">No match.</p>'
@@ -2523,7 +2527,7 @@
     const slot = $("inlineSlot"); slot.innerHTML = ""
     const lab = document.createElement("label"); lab.textContent = "Snooze until"; slot.appendChild(lab)
     const inp = document.createElement("input"); inp.type = "datetime-local"; slot.appendChild(inp)
-    slot.appendChild(mkBtn("Confirm snooze", "btn-snooze", () => {
+    slot.appendChild(mkBtn("Confirm snooze", "btn-snooze mini standoff", () => {
       if (!inp.value) return
       dispose(id, "snoozed", { snooze_until: new Date(inp.value).toISOString() })
     }))
@@ -2590,14 +2594,14 @@
     wrap.appendChild(sel)
 
     const acts = document.createElement("div"); acts.className = "acts"
-    acts.appendChild(mkBtn("Confirm accept", "btn-accept", () => {
+    acts.appendChild(mkBtn("Confirm accept", "btn-accept mini", () => {
       const action = ta.value.trim()
       const delta = {}
       if (action) delta.task_action = action
       if (sel.value) delta.proposition_id = sel.value
       dispose(id, "accepted", Object.keys(delta).length ? { delta } : undefined)
     }))
-    acts.appendChild(mkBtn("Cancel", "btn-snooze", () => { slot.innerHTML = "" }))
+    acts.appendChild(mkBtn("Cancel", "btn-snooze mini", () => { slot.innerHTML = "" }))
     wrap.appendChild(acts)
     slot.appendChild(wrap)
     ta.focus()
