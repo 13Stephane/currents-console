@@ -493,7 +493,7 @@
            This comment deliberately does NOT repeat the token: the script's first real run
            replaced it here as well as below, and its own 2-line guard caught the double
            substitution. Any second copy of that literal in this file breaks publishing. -->
-      <span class="build">build 8deab5f · 2026-08-12</span>
+      <span class="build">build 16d5f80 · 2026-08-13</span>
     </span>
   </div>
 
@@ -545,6 +545,9 @@
       <div class="out" id="rm_out"></div>
       <div id="find_results" class="search-results" style="margin-top:12px"></div>
       <div id="find_add" style="margin-top:12px"></div>
+      <!-- Day 144 · duplicate merge lives on the finder because the finder is where twins
+           appear side by side. Empty until the operator picks ⇆ on a result row. -->
+      <div id="mergeTray" style="margin-top:14px"></div>
     </div>
 
     <!-- Day 141 · the reverse of Find. Find answers "who is this person I already know";
@@ -744,6 +747,7 @@
         <li id="fn-add-7"><strong>Add asset.</strong> Your own content — value props, writings, talks. The resonator scores these against world-events; outreach-composer cites them. Not derived from the spine — this is the only way to seed them.</li>
         <li id="fn-add-8"><strong>Asset library.</strong> Your seeded assets, ordered by the resonator's live relevance score. Click “edit” to revise one (re-embeds on save when title/summary/body change).</li>
         <li id="fn-add-9"><strong>Add a news source.</strong> The daily sweep list. A source added here is fetched by <em>rss-adapter</em> every four hours, and every story it files carries its name through the News tab and into per-source performance. <strong>Sectors and topics</strong> are stamped on every story the feed produces, so they are how it gets found later, not decoration. Only <em>rss</em> is swept today. There is no delete: switching a source off on the News tab keeps its past stories attributable, which deleting it would not.</li>
+        <li id="fn-add-10"><strong>Merge duplicates.</strong> Operator-only — nothing ever merges automatically, and a name match alone is never grounds (§3.6 routes those for disposal instead). Pick ⇆ on two finder rows, then name the <strong>survivor</strong>: the duplicate’s identity fields fill only where the survivor’s are empty (never overwriting), its theses, tasks, involvements and history are repointed, and it is retired behind <em>merged_into</em>. Chained history (affiliations, raw inputs) cannot move: keep its holder as the survivor, or explicitly retire with those rows left in place. A duplicate is reversible; a wrong merge is not.</li>
       </ol>
     </div>
     </div><!-- /addView -->
@@ -1364,7 +1368,10 @@
       // A proposition ranks against its positioning text where it has one — that is the
       // claim people are being matched to. Falling back to the bare title would rank
       // against a label rather than an intent.
-      add("Propositions", pr.propositions || [], "p", (p) => [p.title, p.thesis_statement].filter(Boolean).join(". "))
+      // Day 144: closed streams leave this picker too — ranking people against a stream
+      // you can no longer work is an answer with no next act.
+      add("Propositions", (pr.propositions || []).filter(isOpenStream), "p",
+        (p) => [p.title, p.thesis_statement].filter(Boolean).join(". "))
       add("Open tasks", (tr.tasks || []).filter((t) => t.status === "open"),
         "t", (t) => t.current_action || "")
     } catch (_) { /* free-text path still works */ }
@@ -1485,6 +1492,9 @@
       show($("n_out"), "selected " + p.full_name + " · " + p.person_id + " — log a note below", true)
     })
     acts.appendChild(noteBtn)
+    // Day 144: duplicate merge. Two ⇆ picks open the side-by-side panel below the
+    // results; the operator names the survivor there. Never automatic.
+    acts.appendChild(mkBtn("⇆ merge", "ghost mini", (ev) => { ev.stopPropagation(); mergePick(p) }))
     // Day-91 calibration signal: only on a precise reverse-match (a deliberate lookup
     // disposition), not on live type-ahead — keeps the user_event class free of noise.
     if (precise) {
@@ -1553,6 +1563,153 @@
       })
       return true
     } catch (e) { show($("rm_out"), e.message, false); return false }
+  }
+
+  // ---- Merge duplicates (Day 144) --------------------------------------------------
+  // Operator-driven, on the finder — the surface where twins appear side by side. Two ⇆
+  // picks arm the panel; the operator then names the SURVIVOR by clicking its card (the
+  // same gold selection language as reassign mode). The DB contract (merge_people):
+  // Clause C fill (NULL→value only, never overwriting), repoint mutable children, retire
+  // N:1 via merged_into. Chained rows (affiliations, raw inputs) cannot move — the panel
+  // reads both people's counts FIRST and says which direction is possible, instead of
+  // letting the write refuse after the choice is made. Friction is deliberate:
+  // a duplicate is reversible; a wrong merge is not.
+  let MERGE_PICK = null      // first of the two picks: {person_id, full_name}
+
+  function mergePick(p) {
+    if (MERGE_PICK && MERGE_PICK.person_id === p.person_id) { MERGE_PICK = null; renderMergeTray(); return }
+    if (!MERGE_PICK) { MERGE_PICK = { person_id: p.person_id, full_name: p.full_name }; renderMergeTray(); return }
+    openMergePanel(MERGE_PICK, { person_id: p.person_id, full_name: p.full_name })
+  }
+
+  function renderMergeTray() {
+    const host = $("mergeTray"); host.innerHTML = ""
+    if (!MERGE_PICK) return
+    const bar = document.createElement("div"); bar.className = "selbar"
+    const t = document.createElement("span")
+    t.innerHTML = "⇆ merging <strong>" + esc(MERGE_PICK.full_name) + "</strong> — now click ⇆ on its duplicate"
+    bar.appendChild(t)
+    bar.appendChild(mkBtn("cancel", "ghost mini", () => { MERGE_PICK = null; renderMergeTray() }))
+    host.appendChild(bar)
+  }
+
+  async function openMergePanel(p1, p2) {
+    const host = $("mergeTray"); host.innerHTML = '<p class="hint">reading both profiles…</p>'
+    let r
+    try { r = await api("merge_people_preview", { person_a: p1.person_id, person_b: p2.person_id }) }
+    catch (e) {
+      host.innerHTML = '<p class="hint">' + (/404|unknown op|HTTP 404/i.test(e.message)
+        ? "merge isn’t deployed yet — ships with the pending console deploy."
+        : esc(e.message)) + "</p>"
+      MERGE_PICK = null
+      return
+    }
+    MERGE_PICK = null
+    const pair = [r.a, r.b]
+    const chainedOf = (x) => (x.counts.chained_affiliations || 0) + (x.counts.chained_raw_inputs || 0)
+    let survivor = null
+    host.innerHTML = ""
+    const h = document.createElement("h2")
+    h.innerHTML = 'Merge duplicates<a class="fnmark" href="#fn-add-10">10</a>'
+    host.appendChild(h)
+    const lead = document.createElement("p"); lead.className = "hint"
+    lead.textContent = "Click the card to KEEP. The other is retired into it — its empty fields fill from the duplicate (never overwriting), its theses, tasks and involvements repoint. A duplicate is reversible; a wrong merge is not."
+    host.appendChild(lead)
+
+    const row = document.createElement("div"); row.className = "row"
+    const cards = {}
+    for (const x of pair) {
+      const c = document.createElement("div"); c.className = "pending-card tcard selectable"; cards[x.id] = c
+      c.style.cssText = "flex:1 1 260px;min-width:240px;margin-top:12px"
+      const nm = document.createElement("div"); nm.style.fontSize = "14px"
+      nm.innerHTML = subjectMark("person") + " <strong>" + esc(x.full_name) + "</strong>"
+      c.appendChild(nm)
+      const bits = [x.primary_email, x.linkedin_url, x.location,
+        "since " + (x.created_at || "").slice(0, 10)].filter(Boolean)
+      const meta = document.createElement("div"); meta.className = "hint"; meta.style.marginTop = "4px"
+      meta.textContent = bits.join(" · "); c.appendChild(meta)
+      const k = x.counts
+      const counts = document.createElement("div"); counts.className = "hint"; counts.style.marginTop = "6px"
+      counts.textContent = [
+        k.hypotheses + " hypotheses", k.suggestions + " theses", k.tasks + " tasks",
+        k.stakeholders + " involvements", k.interactions + " interactions",
+      ].join(" · ")
+      c.appendChild(counts)
+      if (chainedOf(x)) {
+        const ch = document.createElement("div")
+        ch.style.cssText = "margin-top:6px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--gold)"
+        ch.textContent = "⛓ " + k.chained_affiliations + " affiliations · " + k.chained_raw_inputs + " raw inputs — chained, cannot move"
+        c.appendChild(ch)
+      }
+      c.onclick = () => { survivor = x.id; paint() }
+      row.appendChild(c)
+    }
+    host.appendChild(row)
+
+    const ctlHost = document.createElement("div"); ctlHost.style.marginTop = "10px"; host.appendChild(ctlHost)
+    const out = document.createElement("div"); out.className = "out"; host.appendChild(out)
+
+    function paint() {
+      for (const x of pair) cards[x.id].classList.toggle("sel", survivor === x.id)
+      ctlHost.innerHTML = ""
+      if (!survivor) {
+        ctlHost.innerHTML = '<p class="hint">No survivor chosen yet.</p>'
+        return
+      }
+      const keep = pair.find((x) => x.id === survivor), lose = pair.find((x) => x.id !== survivor)
+      let cb = null
+      if (chainedOf(lose)) {
+        const w = document.createElement("p"); w.className = "hint"; w.style.color = "var(--reject)"
+        w.textContent = "This direction retires the person holding " + chainedOf(lose)
+          + " chained rows, which cannot be repointed. Prefer keeping "
+          + lose.full_name + " instead — or retire anyway and leave them attributed to the retired row."
+        ctlHost.appendChild(w)
+        const lab = document.createElement("label")
+        lab.style.cssText = "display:flex;gap:8px;align-items:center;font-size:12px;cursor:pointer"
+        cb = document.createElement("input"); cb.type = "checkbox"
+        lab.appendChild(cb)
+        lab.appendChild(document.createTextNode("retire anyway — leave the chained rows in place (orphaned)"))
+        ctlHost.appendChild(lab)
+      }
+      const nlab = document.createElement("label"); nlab.textContent = "Why is this the same person? (optional)"
+      ctlHost.appendChild(nlab)
+      const notes = document.createElement("input"); notes.type = "text"
+      notes.placeholder = "e.g. same LinkedIn profile, added twice from email + import"
+      ctlHost.appendChild(notes)
+      const acts = document.createElement("div"); acts.className = "acts"
+      acts.appendChild(mkBtn("Merge — keep " + keep.full_name, "btn-accept mini", async () => {
+        try {
+          const res = await api("merge_people", {
+            survivor_id: keep.id, loser_id: lose.id,
+            notes: notes.value.trim() || null,
+            orphan_chained: !!(cb && cb.checked),
+          })
+          renderMergeReport(host, keep, lose, res.result || {})
+          runFinder()
+        } catch (e) { show(out, e.message, false) }
+      }))
+      acts.appendChild(mkBtn("Cancel", "btn-snooze mini", () => { host.innerHTML = "" }))
+      ctlHost.appendChild(acts)
+    }
+    paint()
+  }
+
+  // The post-merge reading: what moved, what stayed behind. Zero-count entries are
+  // dropped — the report is what happened, not the schema.
+  function renderMergeReport(host, keep, lose, rep) {
+    host.innerHTML = ""
+    const ok = document.createElement("div")
+    ok.style.cssText = "padding:9px 12px;border-left:2px solid var(--green);"
+      + "background:rgba(255,255,255,.02);font-size:13px;line-height:1.6"
+    const moved = Object.entries(rep.repointed || {}).filter(([, v]) => v > 0)
+      .map(([k, v]) => v + " " + k.replace(/_/g, " ")).join(", ")
+    const orphaned = Object.entries(rep.orphaned || {}).filter(([, v]) => v > 0)
+      .map(([k, v]) => v + " " + k.replace(/_/g, " ")).join(", ")
+    ok.innerHTML = '<span style="color:var(--green)">Merged.</span> '
+      + esc(lose.full_name) + " retired into <strong>" + esc(keep.full_name) + "</strong>."
+      + (moved ? "<br>Repointed: " + esc(moved) + "." : "")
+      + (orphaned ? "<br>Left on the retired row: " + esc(orphaned) + "." : "")
+    host.appendChild(ok)
   }
 
   async function loadSuggestions() {
@@ -2587,7 +2744,7 @@
     const none = document.createElement("option"); none.value = ""; none.textContent = "— standalone (no stream) —"
     sel.appendChild(none)
     for (const p of TASK_PROPS) {
-      if (p.status === "dropped" || p.status === "archived") continue
+      if (!isOpenStream(p)) continue
       const o = document.createElement("option"); o.value = p.id; o.textContent = p.title
       sel.appendChild(o)
     }
@@ -2784,6 +2941,12 @@
   // Build 2's list_tasks/update_task ops had no UI. A status change (complete/abandon/stall)
   // writes a chained feedback_event (the grade-3 outcome signal); a pure action-text amend writes none.
   let TASK_PROPS = []   // Day 120: proposition summaries, cached for the per-task assign picker
+  // Day 144: one definition of a stream you can still see and file work into — active or
+  // paused. complete / dropped / archived are closed decisions, and a closed stream leaves
+  // the rail and every task picker at once, so the list you file into can never disagree
+  // with the list you see. A task already filed into a retired stream stays readable:
+  // taskPropPicker keeps the current value selectable even when it is filtered from the list.
+  function isOpenStream(p) { return p.status === "active" || p.status === "paused" }
 
   // Day 139 — bulk filing selection (docs/spec_bulk_task_filing_2026-08-09.md).
   // Hand-picked, not filtered-set: decided on live data — 6 unassigned tasks against a Tasks tab
@@ -2867,6 +3030,7 @@
     none.value = ""; none.textContent = "— detach (no stream) —"
     sel.appendChild(none)
     for (const p of TASK_PROPS) {
+      if (!isOpenStream(p)) continue
       const o = document.createElement("option"); o.value = p.id; o.textContent = p.title
       sel.appendChild(o)
     }
@@ -2889,7 +3053,7 @@
     none.value = ""; none.textContent = "— standalone (no stream) —"
     sel.appendChild(none)
     for (const p of TASK_PROPS) {
-      if (p.status === "dropped" || p.status === "archived") continue
+      if (!isOpenStream(p)) continue
       const o = document.createElement("option"); o.value = p.id; o.textContent = p.title
       sel.appendChild(o)
     }
@@ -3087,6 +3251,7 @@
     sel.appendChild(none)
     let hasCurrent = false
     for (const p of TASK_PROPS) {
+      if (!isOpenStream(p) && p.id !== t.proposition_id) continue
       const o = document.createElement("option"); o.value = p.id; o.textContent = p.title
       if (p.id === t.proposition_id) { o.selected = true; hasCurrent = true }
       sel.appendChild(o)
@@ -3203,13 +3368,18 @@
     return p.status === "complete" && p.outcome ? "complete · " + p.outcome : p.status
   }
 
+  // Day 141 hid dropped ("a closed decision, not a workspace"); Day 144 extends the same
+  // rule to complete and archived — every non-open status leaves the working list, keyed on
+  // the SAME isOpenStream predicate the task pickers use, so what you see and what you can
+  // file into can never disagree. The retired group stays one click away (the Day-143
+  // retired-tasks idiom) so an outcome remains readable without a database query.
+  let PROP_SHOW_RETIRED = false
+  let PROP_RAIL_CACHE = []
   function renderPropRail(allProps) {
+    PROP_RAIL_CACHE = allProps
     const host = $("propRail"); host.innerHTML = ""
-    // Day 141: a dropped proposition is a closed decision, not a workspace. It stays in the
-    // database (and in lineage, and in get_proposition's recursive family) — it just leaves
-    // the working list, which is the only place its presence cost anything.
-    const props = allProps.filter((p) => p.status !== "dropped")
-    const droppedCount = allProps.length - props.length
+    const props = allProps.filter(isOpenStream)
+    const retired = allProps.filter((p) => !isOpenStream(p))
     const ph = document.createElement("div"); ph.className = "col-h"; ph.style.paddingTop = "14px"
     ph.textContent = "Streams · " + props.length
     host.appendChild(ph)
@@ -3217,10 +3387,11 @@
       host.appendChild(Object.assign(document.createElement("p"),
         { className: "empty", textContent: "None yet — create one above." }))
     }
-    for (const p of props) {
+    const railRow = (p, dim) => {
       const row = document.createElement("div"); row.className = "rail-item"
       row.dataset.pid = p.id
       if (PROP_OPEN === p.id) row.classList.add("sel")
+      if (dim) row.style.opacity = ".55"
       const t = document.createElement("div"); t.className = "rclaim"
       t.innerHTML = markSpan("stream", "mk-inf") + " " + esc(p.title)
       row.appendChild(t)
@@ -3231,13 +3402,18 @@
         + " · " + p.stakeholders + " stkhldr"
       row.appendChild(m)
       row.addEventListener("click", () => openProposition(p.id))
-      host.appendChild(row)
+      return row
     }
-    if (droppedCount) {
-      const d = document.createElement("p"); d.className = "empty"
-      d.style.cssText = "padding:8px 16px;font-size:11px"
-      d.textContent = droppedCount + (droppedCount === 1 ? " dropped stream is" : " dropped streams are") + " hidden."
-      host.appendChild(d)
+    for (const p of props) host.appendChild(railRow(p, false))
+    if (retired.length) {
+      const by = {}
+      for (const p of retired) { const k = streamState(p); by[k] = (by[k] || 0) + 1 }
+      const summary = Object.entries(by).map(([k, v]) => v + " " + k).join(" · ")
+      const tog = mkBtn((PROP_SHOW_RETIRED ? "hide" : "show") + " " + retired.length + " retired · " + summary,
+        "ghost mini", () => { PROP_SHOW_RETIRED = !PROP_SHOW_RETIRED; renderPropRail(PROP_RAIL_CACHE) })
+      tog.style.margin = "10px 16px 0"
+      host.appendChild(tog)
+      if (PROP_SHOW_RETIRED) for (const p of retired) host.appendChild(railRow(p, true))
     }
 
     // Floating tasks: real work that belongs to no workspace. Kept in this column rather
