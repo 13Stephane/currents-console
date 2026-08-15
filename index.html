@@ -517,7 +517,7 @@
            This comment deliberately does NOT repeat the token: the script's first real run
            replaced it here as well as below, and its own 2-line guard caught the double
            substitution. Any second copy of that literal in this file breaks publishing. -->
-      <span class="build">build 16d5f80+dirty · 2026-08-15</span>
+      <span class="build">build c5d68a1 · 2026-08-15</span>
     </span>
   </div>
 
@@ -3831,7 +3831,17 @@
   // The grip, not the card, starts the drag. The card's surface is already a click target in
   // reassign mode and is full of buttons, selects and inline editors; making the whole thing
   // draggable would put a second meaning on a surface that already has one.
-  let DRAG_TASK_ID = null
+  // The dragged row is held as a NODE rather than re-found by id at drop time. Simpler than
+  // building a selector, and it cannot be defeated by the shape of an id.
+  //
+  // Recorded because it was nearly a wrong fix: `CSS.escape(id)` inside the old
+  // `[data-tid="…"]` lookup was suspected of breaking on the 9-of-12 live task UUIDs that begin
+  // with a digit. It does not. CSS.escape yields `\32 95eb435-…`, and inside a QUOTED attribute
+  // selector the browser parses `\32 ` as a CSS string escape and resolves it back to `2`, so
+  // the value round-trips and the selector matches. Verified in the browser against a real
+  // task id before this comment was written — the suspicion was tested, not reasoned about, and
+  // it was wrong. The escaping was redundant, never broken.
+  let DRAG_TASK_ID = null, DRAG_TASK_EL = null
 
   // cardOpts is passed straight through to taskCard. The Streams pane sends {bulk:false} because
   // the selection bar those checkboxes report to lives on Do Next; Do Next sends nothing, so
@@ -3861,13 +3871,16 @@
     grip.addEventListener("mouseup", release)
 
     row.addEventListener("dragstart", (e) => {
-      DRAG_TASK_ID = t.id
+      DRAG_TASK_ID = t.id; DRAG_TASK_EL = row
       e.dataTransfer.effectAllowed = "move"
       // Firefox refuses to start a drag without payload; the id is also the honest payload.
       try { e.dataTransfer.setData("text/plain", t.id) } catch (_) {}
       row.style.opacity = ".45"
     })
-    row.addEventListener("dragend", () => { row.style.opacity = ""; release(); clearDropMarks(row.parentNode) })
+    row.addEventListener("dragend", () => {
+      row.style.opacity = ""; release(); clearDropMarks(row.parentNode)
+      DRAG_TASK_ID = null; DRAG_TASK_EL = null
+    })
 
     row.addEventListener("dragover", (e) => {
       if (!DRAG_TASK_ID || DRAG_TASK_ID === t.id) return
@@ -3889,13 +3902,17 @@
       const above = row.dataset.dropAbove === "1"
       clearDropMarks(host)
       if (!DRAG_TASK_ID || DRAG_TASK_ID === t.id) return
-      const moving = host.querySelector('[data-tid="' + CSS.escape(DRAG_TASK_ID) + '"]')
-      if (!moving) return
+      const moving = DRAG_TASK_EL
+      // Same lane only — defensive, not a fix for anything observed: the Streams lane and the
+      // Do Next lane live on different tabs and are never mounted together, so a cross-lane drop
+      // is not reachable today. It costs one comparison and it means the two orders can never
+      // come to claim the same row if that ever changes.
+      if (!moving || moving.parentNode !== host) return
       // Move it in the DOM first so the list answers the drag instantly, then persist and
       // re-read. The screen is never left showing an order the database does not hold: the
       // refetch in onDrop is what closes that gap, including on failure.
       host.insertBefore(moving, above ? row : row.nextSibling)
-      DRAG_TASK_ID = null
+      DRAG_TASK_ID = null; DRAG_TASK_EL = null
       onDrop([...host.querySelectorAll("[data-tid]")].map((el) => el.dataset.tid))
     })
     return row
