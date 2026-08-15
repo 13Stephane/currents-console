@@ -155,6 +155,30 @@
   button.mini.standoff { margin-top: 14px; }
 
   /* §3.4 disposal surface — view nav + split-reader (Layout C) */
+  /* Day 145 · the loop-health strip. Machinery, so mono and quiet — it reports on the console
+     rather than being part of the work done in it. No box and no fill: one rule underneath, the
+     same device the nav uses to say "this is a level, not an object". It must read as an
+     instrument panel glanced at, never as a call to action. */
+  .loop-health { margin: 0 0 14px; }
+  .lh-line {
+    margin: 0; width: 100%; text-align: left; background: transparent; border: 0;
+    border-bottom: 1px solid var(--line); border-radius: 0; padding: 6px 2px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .04em;
+    color: var(--ink-faint); cursor: pointer;
+  }
+  .lh-line:hover { color: var(--ink-dim); }
+  .lh-line b { font-weight: 600; }
+  .lh-panel { padding: 10px 2px 4px; border-bottom: 1px solid var(--line); }
+  /* A capability's row. The state word carries the colour, not the whole row: a surface that
+     has never been used is a finding, not an error, and painting the line red would say the
+     console is broken when it is only unexercised. */
+  .lh-feat { display: flex; gap: 10px; align-items: baseline; padding: 3px 0; font-size: 11.5px; }
+  .lh-feat .lh-state {
+    font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: .08em;
+    text-transform: uppercase; min-width: 92px;
+  }
+  .lh-feat .lh-ev { color: var(--ink-faint); font-size: 10.5px; margin-left: auto; text-align: right; }
+
   .nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 26px; }
   /* A tab is a PLACE, not an act (see the button rule above): no enclosing box, just a
      rule above and below, and a filled gold rectangle when you are standing in it. The
@@ -493,7 +517,7 @@
            This comment deliberately does NOT repeat the token: the script's first real run
            replaced it here as well as below, and its own 2-line guard caught the double
            substitution. Any second copy of that literal in this file breaks publishing. -->
-      <span class="build">build 16d5f80 · 2026-08-13</span>
+      <span class="build">build 16d5f80+dirty · 2026-08-15</span>
     </span>
   </div>
 
@@ -510,6 +534,26 @@
   </div>
 
   <div id="app" class="hidden">
+    <!-- Day 145 · the loop's own vital signs, above the nav and therefore on every screen.
+         Two facts, side by side, because neither is a reading on its own:
+
+           1. IS THE LOOP TURNING — disposals in the trailing 7 days. The learning rate IS the
+              disposal rate, and this number has until now lived only in session_open.sh §10 and
+              preflight.sh §9: visible at the terminal, invisible at the console where the
+              disposing actually happens. The floor shown is preflight's own (1/7d), not a new
+              threshold invented here — see the footnote.
+           2. WHICH PARTS OF THE SURFACE TURN IT — how many capabilities have ever been
+              exercised, and how many never have. Day 144 retired the Done button on a by-hand
+              reading of exactly this kind; v_feature_exercise makes it continuous.
+
+         Collapsed to one line by default. It is a background instrument, not a dashboard: the
+         operator's primary act is disposal, and this must not compete with it for the screen. -->
+    <div id="loopHealth" class="loop-health hidden">
+      <button id="loopHealthLine" class="lh-line" aria-expanded="false"
+              title="Learning-loop health — click for the per-capability breakdown"></button>
+      <div id="loopHealthPanel" class="lh-panel hidden"></div>
+    </div>
+
     <!-- Left-to-right = the review flow (News → Theses → Propositions → Tasks); the
          create/act hub (Find/add, which now also declares initiatives) sits to the right. -->
     <div class="nav" id="mainNav">
@@ -979,6 +1023,7 @@
       <div class="fn-lead">Notes</div>
       <ol>
         <li id="fn-stream-1"><strong>Streams.</strong> Durable workspaces — one per product or multi-stakeholder project. A stream holds its stakeholders, its organizations, its tasks and the theses folded into it. Tasks that belong to no stream sit under <strong>Floating tasks</strong> in the same column, because filing one is a move up into the list above it.</li>
+        <li id="fn-stream-3"><strong>Task order.</strong> Tasks sort by review date until you drag one. From then on the stream holds <em>your</em> order and the heading says so, with “reset to review date” to hand it back to the clock. The review chip stays on every card either way, so a task can be out of date order without becoming invisible — that is the trade you are making when you drag, and it is reversible.</li>
         <li id="fn-stream-2"><strong>Outcome: dropped is not ended.</strong> <em>Ended</em> means the work concluded with neither a win nor a loss. <em>Dropped</em> means you withdrew before it concluded, and that is the one the withdrawal rate counts. The distinction is the point: dropping the claims you have lost faith in improves apparent accuracy without improving judgement, so the two are never merged.</li>
       </ol>
     </div>
@@ -1073,12 +1118,125 @@
     return data
   }
 
+  // ── Day 145 · learning-loop health ──────────────────────────────────────────
+  //
+  // THE ONE ENCODED THRESHOLD is preflight.sh's own disposal floor: 1 resolved thesis in the
+  // trailing 7 days. It is repeated here rather than reinvented, so the console and the preflight
+  // script cannot disagree about whether the loop is turning. No other band is asserted — the
+  // raw counts are shown and the operator reads them. Inventing a "healthy" rate here would put
+  // a number on screen that nothing in the system actually stands behind.
+  const DISPOSAL_FLOOR_7D = 1
+  let LOOP_HEALTH = null
+
+  async function loadLoopHealth() {
+    try {
+      LOOP_HEALTH = await api("learning_health", {})
+      renderLoopHealth()
+    } catch (e) {
+      // A failed read must not claim health. The strip says so and stays out of the way.
+      const host = $("loopHealth"); if (!host) return
+      host.classList.remove("hidden")
+      $("loopHealthLine").innerHTML = 'loop health unavailable · <span style="color:var(--reject)">'
+        + esc(e.message) + "</span>"
+    }
+  }
+
+  function renderLoopHealth() {
+    const host = $("loopHealth"); if (!host || !LOOP_HEALTH) return
+    host.classList.remove("hidden")
+    const ls = LOOP_HEALTH.learning_state || {}
+    const ru = LOOP_HEALTH.rollup || {}
+    const d7 = ls.resolved_7d
+    const turning = typeof d7 === "number" && d7 >= DISPOSAL_FLOOR_7D
+    const bits = []
+
+    // 1 · is the loop turning
+    bits.push('<span style="color:var(--ink-dim)">loop</span> '
+      + '<b style="color:' + (turning ? "var(--green)" : "var(--gold)") + '">'
+      + (typeof d7 === "number" ? d7 : "—") + " disposed</b> / 7d"
+      + (turning ? "" : ' <span style="color:var(--gold)">· below floor ' + DISPOSAL_FLOOR_7D + "</span>"))
+
+    // 2 · what it has learned from — reference classes that have enough resolutions to band.
+    if (typeof ls.classes_total === "number") {
+      bits.push("<b>" + (ls.classes_green || 0) + "/" + ls.classes_total + "</b> classes green")
+    }
+    if (ls.soft_layer_pct != null) bits.push("soft layer <b>" + ls.soft_layer_pct + "%</b>")
+
+    // 3 · which parts of the surface turn it
+    if (ru.n_measurable) {
+      const exercised = (ru.n_live || 0) + (ru.n_dormant || 0)
+      bits.push('<span style="color:var(--ink-dim)">surface</span> <b>'
+        + exercised + "/" + ru.n_measurable + "</b> exercised"
+        + (ru.n_never ? ' · <b style="color:var(--gold)">' + ru.n_never + " never used</b>" : "")
+        + (ru.n_dormant ? " · " + ru.n_dormant + " dormant" : ""))
+    }
+
+    const open = $("loopHealthPanel") && !$("loopHealthPanel").classList.contains("hidden")
+    $("loopHealthLine").innerHTML = bits.join(' <span style="color:var(--line)">│</span> ')
+      + ' <span style="color:var(--ink-faint)">' + (open ? "▾" : "▸") + "</span>"
+    $("loopHealthLine").setAttribute("aria-expanded", open ? "true" : "false")
+    if (open) renderLoopHealthPanel()
+  }
+
+  function renderLoopHealthPanel() {
+    const panel = $("loopHealthPanel"); if (!panel || !LOOP_HEALTH) return
+    panel.innerHTML = ""
+    const feats = LOOP_HEALTH.features || []
+
+    const note = document.createElement("p"); note.className = "hint"; note.style.margin = "0 0 10px"
+    note.innerHTML = "Counts <em>effects</em>, not clicks: every figure below traces to a "
+      + "feedback event, an append-table row or a non-null column, so a control you opened and "
+      + "abandoned does not read as used. <strong>never</strong> means the capability exists and "
+      + "has produced nothing — the retirement question. <strong>not measured</strong> means it "
+      + "leaves no trace and cannot be counted; those rows are listed rather than omitted, "
+      + "because a missing row would read as an unused one."
+    panel.appendChild(note)
+
+    // Ordered by what the operator would act on: dead first, then dormant, then the honest gap,
+    // and live last — a working capability needs no attention and should not lead the list.
+    const ORDER = [
+      { state: "never", label: "never used", color: "var(--gold)" },
+      { state: "dormant", label: "dormant 90d+", color: "var(--ink-dim)" },
+      { state: "not_measured", label: "not measured", color: "var(--ink-faint)" },
+      { state: "live", label: "live", color: "var(--green)" },
+    ]
+    for (const grp of ORDER) {
+      const rows = feats.filter((f) => f.state === grp.state)
+      if (!rows.length) continue
+      const h = document.createElement("div"); h.className = "hint"
+      h.style.cssText = "text-transform:uppercase;letter-spacing:.12em;margin:12px 0 4px;color:" + grp.color
+      h.textContent = grp.label + " · " + rows.length
+      panel.appendChild(h)
+      rows.sort((a, b) => (a.surface || "").localeCompare(b.surface || "")
+        || (a.label || "").localeCompare(b.label || ""))
+      for (const f of rows) {
+        const r = document.createElement("div"); r.className = "lh-feat"
+        const st = document.createElement("span"); st.className = "lh-state"
+        st.style.color = grp.color
+        // n is NULL for an unmeasurable surface and 0 for a measured zero. The display keeps
+        // them apart: "—" is "cannot be counted", "0" is "counted, and it is zero".
+        st.textContent = f.measurable ? String(f.n) + "×" : "—"
+        r.appendChild(st)
+        const lab = document.createElement("span")
+        lab.innerHTML = '<span style="color:var(--gold)">' + esc(f.surface) + "</span> · " + esc(f.label)
+          + (f.days_since != null ? ' <span style="color:var(--ink-faint)">· ' + f.days_since + "d ago</span>" : "")
+        r.appendChild(lab)
+        const ev = document.createElement("span"); ev.className = "lh-ev"; ev.textContent = f.evidence || ""
+        r.appendChild(ev)
+        panel.appendChild(r)
+      }
+    }
+  }
+
   function enterApp() {
     $("gatePanel").classList.add("hidden")
     $("app").classList.remove("hidden")
     // Seed the due count without visiting Tasks: a badge that only appears once you have
     // already gone looking is the passive-chip problem again, one level up.
     api("list_tasks", {}).then((r) => paintDueBadge(r.tasks || [])).catch(() => {})
+    // Same reasoning one level up: the loop's health must be on screen before you go looking
+    // for it, or it is only ever read by someone who already suspected something.
+    loadLoopHealth()
     // Land on Dispose, not Add — disposal is the operator's primary act (system
     // proposes, human disposes), and the feed is no longer empty (28+ pending).
     showDispose()
@@ -3475,15 +3633,133 @@
     host.appendChild(taskCard(t, { bulk: false }))
   }
 
-  function propSection(t) {
+  // Day 145 · a section heading can carry its own controls.
+  //
+  // `+ add stakeholder` used to sit on a line of its own beneath a list of names, which cost a
+  // full row of vertical space to say something the heading was already about. A control that
+  // acts on exactly one section belongs ON that section's rule, where it reads as part of the
+  // heading rather than as the first item of whatever comes next.
+  function propSection(t, controls, fn) {
     const d = document.createElement("div"); d.className = "hint"
-    d.style.cssText = "text-transform:uppercase;letter-spacing:.12em;color:var(--ink-faint);margin:18px 0 8px;border-bottom:1px solid var(--line);padding-bottom:4px"
-    d.textContent = t; return d
+    d.style.cssText = "display:flex;align-items:center;gap:10px;flex-wrap:wrap;"
+      + "text-transform:uppercase;letter-spacing:.12em;color:var(--ink-faint);"
+      + "margin:18px 0 8px;border-bottom:1px solid var(--line);padding-bottom:4px"
+    const lab = document.createElement("span"); lab.textContent = t; d.appendChild(lab)
+    // The footnote mark rides with the LABEL, not with the controls: it explains the section,
+    // and parked on the right it would read as annotating whatever button ended up next to it.
+    if (fn) {
+      const a = document.createElement("a"); a.className = "fnmark"
+      a.href = "#fn-stream-" + fn; a.textContent = String(fn); d.appendChild(a)
+    }
+    if (controls) {
+      const slot = document.createElement("span")
+      // margin-left:auto only for the controls, so the label keeps its place at the left rule
+      // whatever the panel width. The heading text must not drift with the button.
+      slot.style.cssText = "margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap"
+      for (const c of [].concat(controls)) if (c) slot.appendChild(c)
+      d.appendChild(slot)
+    }
+    return d
   }
-  // propColumn / makeDraggable / makeDropTarget retired Day 142 with the stakeholder board,
-  // their only remaining caller — the now/next/later task board had already gone on Day 141.
-  // Drag was the third way to set a stage beside the column and the select, and it was the
-  // one that could not reach declined or dropped. One clickable tag replaces all three.
+  // The Day-142 propColumn / makeDraggable / makeDropTarget were retired with the stakeholder
+  // board: drag was a third way to set a stage beside the column and the select, and the one
+  // that could not reach declined or dropped. Nothing below reinstates that. Task order is a
+  // different case — there is no other control that sets it, because there was no such thing as
+  // a hand-set task order until Day 145. Drag is the only way to express it, not a third way.
+
+  // ── Day 145 · drag to reorder tasks within a stream ─────────────────────────
+  //
+  // Only OPEN tasks are draggable, and only open tasks are sent. A retired task carries no rank
+  // (get_proposition sorts stream_rank NULLS LAST, and terminal rows carry no review clock
+  // either), so it sits below the live work wherever the operator drags. Ranking a completed
+  // task would be arranging something that is finished.
+  //
+  // The grip, not the card, starts the drag. The card's surface is already a click target in
+  // reassign mode and is full of buttons, selects and inline editors; making the whole thing
+  // draggable would put a second meaning on a surface that already has one.
+  let DRAG_TASK_ID = null
+
+  function taskDragRow(p, t, onDrop) {
+    const row = document.createElement("div")
+    row.dataset.tid = t.id
+    row.style.cssText = "display:flex;align-items:flex-start;gap:8px"
+
+    const grip = document.createElement("span")
+    grip.textContent = "⠿"
+    grip.title = "Drag to reorder this task within the stream"
+    grip.style.cssText = "font-family:'IBM Plex Mono',monospace;color:var(--ink-faint);"
+      + "cursor:grab;padding:14px 2px 0;user-select:none;line-height:1"
+    row.appendChild(grip)
+
+    const body = document.createElement("div"); body.style.cssText = "flex:1;min-width:0"
+    body.appendChild(taskCard(t, { bulk: false }))
+    row.appendChild(body)
+
+    // draggable is turned on only while the grip is held. Left permanently on, the browser
+    // treats a text selection inside the card as the start of a drag, which makes reading a
+    // task's prose feel like it is about to move it.
+    grip.addEventListener("mousedown", () => { row.draggable = true; grip.style.cursor = "grabbing" })
+    const release = () => { row.draggable = false; grip.style.cursor = "grab" }
+    grip.addEventListener("mouseup", release)
+
+    row.addEventListener("dragstart", (e) => {
+      DRAG_TASK_ID = t.id
+      e.dataTransfer.effectAllowed = "move"
+      // Firefox refuses to start a drag without payload; the id is also the honest payload.
+      try { e.dataTransfer.setData("text/plain", t.id) } catch (_) {}
+      row.style.opacity = ".45"
+    })
+    row.addEventListener("dragend", () => { row.style.opacity = ""; release(); clearDropMarks(row.parentNode) })
+
+    row.addEventListener("dragover", (e) => {
+      if (!DRAG_TASK_ID || DRAG_TASK_ID === t.id) return
+      e.preventDefault()
+      e.dataTransfer.dropEffect = "move"
+      // Above or below, decided by which half of the row the pointer is in. Without this the
+      // drop lands "somewhere near here" and the operator cannot aim.
+      const r = row.getBoundingClientRect()
+      const above = (e.clientY - r.top) < r.height / 2
+      clearDropMarks(row.parentNode)
+      row.style.boxShadow = above ? "inset 0 2px 0 0 var(--gold)" : "inset 0 -2px 0 0 var(--gold)"
+      row.dataset.dropAbove = above ? "1" : "0"
+    })
+    row.addEventListener("dragleave", () => { row.style.boxShadow = ""; delete row.dataset.dropAbove })
+
+    row.addEventListener("drop", (e) => {
+      e.preventDefault()
+      const host = row.parentNode
+      const above = row.dataset.dropAbove === "1"
+      clearDropMarks(host)
+      if (!DRAG_TASK_ID || DRAG_TASK_ID === t.id) return
+      const moving = host.querySelector('[data-tid="' + CSS.escape(DRAG_TASK_ID) + '"]')
+      if (!moving) return
+      // Move it in the DOM first so the list answers the drag instantly, then persist and
+      // re-read. The screen is never left showing an order the database does not hold: the
+      // refetch in onDrop is what closes that gap, including on failure.
+      host.insertBefore(moving, above ? row : row.nextSibling)
+      DRAG_TASK_ID = null
+      onDrop([...host.querySelectorAll("[data-tid]")].map((el) => el.dataset.tid))
+    })
+    return row
+  }
+
+  function clearDropMarks(host) {
+    if (!host) return
+    for (const el of host.querySelectorAll("[data-tid]")) {
+      el.style.boxShadow = ""; delete el.dataset.dropAbove
+    }
+  }
+
+  async function persistTaskOrder(p, ids) {
+    try {
+      await api("set_task_order", { proposition_id: p.id, task_ids: ids })
+    } catch (e) {
+      alert("Reorder failed — nothing was moved.\n\n" + e.message)
+    }
+    // Re-read either way (L57): the pane shows what the database returned, not what the drag
+    // did. On success this is the proof; on failure it is the correction.
+    openProposition(p.id)
+  }
 
   function renderPropDetail(p) {
     const host = $("propDetail"); host.innerHTML = ""
@@ -3495,36 +3771,57 @@
       const ts = document.createElement("div"); ts.style.cssText = "font-style:italic;color:var(--ink-dim);margin:4px 0 10px"
       ts.textContent = "“" + p.thesis_statement + "”"; host.appendChild(ts)
     }
-    // Day 141 — three rows, grouped by what the control DOES, not by when it was built.
-    // They used to be scattered: reframe/lineage/history at the top, review-description and
-    // restructure-tasks buried below the horizon lanes, fold-a-thesis at the very bottom of
-    // the page. Four buttons that all reshape this proposition sat in three different places.
+    // Day 141 grouped these two rows by what the control DOES rather than by when it was built,
+    // and that grouping is unchanged. Day 145 moves the pair to the FOOT of the pane.
     //
-    //   1. ACT           — the four that change the proposition. One shared slot, so opening
-    //                      a second proposal replaces the first instead of stacking panels.
+    //   1. ACT           — the four that change the stream. One shared slot, so opening a
+    //                      second proposal replaces the first instead of stacking panels.
     //   2. READ + OUTCOME — lineage/history (read-only viewers) and the lifecycle verbs, on
-    //                      one line separated by a rule. Two lines total, not three: at mini
-    //                      size the whole control block is a glance rather than a column.
+    //                      one line separated by a rule.
+    //
+    // WHY THEY MOVED. The pane now reads in the order the work is actually thought about:
+    // WHO (stakeholders, organizations) · WHAT (tasks, the theses folded in) · THEN what to do
+    // about the stream as a whole. Seven buttons sat between the stream's title and the first
+    // fact about it, so the answer to "who is on this and what is outstanding" was below a
+    // control block that is used a handful of times in a stream's whole life. Declaring an
+    // outcome is the last thing you do to a stream, and it now sits where the reading ends.
+    //
+    // Constructed here and appended at the bottom of this function — the closures below capture
+    // `actSlot`/`lnSlot`, so building them in place keeps each panel next to the button that
+    // opens it rather than splitting the pair across the file.
     const actSlot = document.createElement("div"); actSlot.style.margin = "0 0 4px"
     const act = document.createElement("div"); act.className = "acts"; act.style.marginTop = "10px"
-    const mini = (label, cls, fn) => { const b = mkBtn(label, cls + " mini", fn); b.style.marginTop = "0"; return b }
-    act.appendChild(mini("Reframe thesis", "btn-edit", () =>
+    // Day 145 · the control block moved to the foot of the pane, so a panel it opens can land
+    // below the fold — the button is at the bottom of a long page and its output starts under
+    // it. reveal() puts the slot on screen after the panel has rendered. Two frames, because
+    // several of these panels populate in a promise callback and measuring before that gives
+    // the height of an empty div; `nearest` so a panel already in view does not jump.
+    const reveal = (slot) => requestAnimationFrame(() =>
+      setTimeout(() => slot.scrollIntoView({ block: "nearest", behavior: "smooth" }), 60))
+    const mini = (label, cls, fn) => {
+      const b = mkBtn(label, cls + " mini", fn); b.style.marginTop = "0"; return b
+    }
+    // Only the buttons that OPEN A PANEL get the reveal. The lifecycle verbs below re-render the
+    // whole pane instead, and scrolling toward a node that is about to be replaced would fight
+    // the repaint.
+    const miniPanel = (label, cls, slot, fn) =>
+      mini(label, cls, () => { fn(); reveal(slot) })
+    act.appendChild(miniPanel("Reframe thesis", "btn-edit", actSlot, () =>
       openReframe("proposition", p.id, p.thesis_statement || p.title, actSlot, async (text) => {
         await api("update_proposition", { proposition_id: p.id, thesis_statement: text }); openProposition(p.id)
       })))
-    act.appendChild(mini("Review description", "btn-edit", () => openDescriptionReview(p.id, actSlot)))
-    act.appendChild(mini("Restructure tasks", "btn-edit", () => openRestructure(p.id, actSlot)))
-    act.appendChild(mini("Fold a pending thesis", "btn-edit", () => openFoldPicker(p, actSlot)))
-    host.appendChild(act); host.appendChild(actSlot)
+    act.appendChild(miniPanel("Review description", "btn-edit", actSlot, () => openDescriptionReview(p.id, actSlot)))
+    act.appendChild(miniPanel("Restructure tasks", "btn-edit", actSlot, () => openRestructure(p.id, actSlot)))
+    act.appendChild(miniPanel("Fold a pending thesis", "btn-edit", actSlot, () => openFoldPicker(p, actSlot)))
 
     // Lineage (§5). Present on every proposition: the op answers "was this folded from
     // anything" for propositions that were not, which is itself the reading.
     const lnSlot = document.createElement("div"); lnSlot.dataset.open = "0"; lnSlot.style.margin = "0 0 10px"
     const life = document.createElement("div"); life.className = "acts"; life.style.margin = "8px 0 4px"
-    life.appendChild(mini("Lineage", "btn-snooze", () => openLineage(p.id, lnSlot)))
+    life.appendChild(miniPanel("Lineage", "btn-snooze", lnSlot, () => openLineage(p.id, lnSlot)))
     // History (Day 140 follow-up): what the description used to say — the counterweight to
     // Reframe and Review description, so neither is a one-way door.
-    life.appendChild(mini("History", "btn-snooze", () => openPropHistory(p.id, lnSlot)))
+    life.appendChild(miniPanel("History", "btn-snooze", lnSlot, () => openPropHistory(p.id, lnSlot)))
     const sep = document.createElement("span")
     sep.style.cssText = "border-left:1px solid var(--line);margin:0 4px;align-self:stretch"
     life.appendChild(sep)
@@ -3559,8 +3856,8 @@
       if (o.title) btn.title = o.title
       life.appendChild(btn)
     }
-    host.appendChild(life); host.appendChild(lnSlot)
 
+    // ── WHO ──────────────────────────────────────────────────────────────────
     // Stakeholders — ONE list, stage carried as a clickable tag (Day 142).
     //
     // Was a four-column board plus a <select> per card plus a drag handler, which is three
@@ -3571,7 +3868,19 @@
     //
     // Sorted by engagement, hottest first, so the list reads as a funnel rather than as
     // insertion order.
-    host.appendChild(propSection("Stakeholders · " + p.stakeholders.length))
+    // Day 143 made this mini, like every other control on this pane. Day 145 moves it onto the
+    // section rule: it acted on the Stakeholders section but sat on its own line beneath the
+    // list, spending a full row to say what the heading already said, and pushing Tasks — the
+    // thing you actually came to read — a row further down on every stream.
+    const addBtn = mkBtn("+ add stakeholder", "btn-edit mini", () => openAddStakeholder(p))
+    addBtn.style.marginTop = "0"
+    host.appendChild(propSection("Stakeholders · " + p.stakeholders.length, addBtn))
+    // The search panel mounts here — directly under the button that opens it, above the list,
+    // rather than below a list that can run to a dozen names. Empty it occupies no height, so
+    // the row it used to cost is genuinely returned. openAddStakeholder still owns this node by
+    // id and is unchanged.
+    const addWrap = document.createElement("div"); addWrap.id = "addStakeWrap"
+    host.appendChild(addWrap)
     if (!p.stakeholders.length) {
       const e = document.createElement("p"); e.className = "hint"
       e.textContent = "No one on this stream yet. Add a stakeholder, or fold a thesis in — its subject attaches automatically."
@@ -3581,15 +3890,9 @@
     const ranked = p.stakeholders.slice().sort((a, b) =>
       order.indexOf(a.stage) - order.indexOf(b.stage) || (a.name || "").localeCompare(b.name || ""))
     for (const s of ranked) host.appendChild(stakeholderRow(p, s))
-    const addWrap = document.createElement("div"); addWrap.id = "addStakeWrap"; addWrap.style.marginTop = "10px"
-    // Day 143: mini, like every other control on this pane. It was the one full-size button
-    // left on the Streams detail, so the quietest act on the page (adding a name) carried the
-    // heaviest control — and it sat directly under a list of 9.5px stage tags.
-    const addBtn = mkBtn("+ add stakeholder", "btn-edit mini", () => openAddStakeholder(p))
-    addBtn.style.marginTop = "0"
-    addWrap.appendChild(addBtn); host.appendChild(addWrap)
 
-    // organizations
+    // organizations — still WHO, so it stays with the stakeholders rather than starting a
+    // section of its own further down.
     host.appendChild(propSection("Organizations"))
     const orgs = document.createElement("div"); orgs.className = "hint"
     orgs.textContent = p.orgs.length
@@ -3601,7 +3904,27 @@
     // record_disposal hardcoded 'now', nothing ever moved a task off it, and 29 of 30 open
     // tasks sat there — a board with three columns sorting one bucket. `horizon` is still on
     // the row and still returned by get_proposition; only the board is gone.
-    host.appendChild(propSection("Tasks · by review date"))
+    //
+    // Day 145 · the operator can override that order by dragging. `stream_rank` is NULL until
+    // they do, so an untouched stream sorts exactly as it did before — see the migration header
+    // for why this is not a rerun of the horizon board.
+    const isRanked = p.tasks.some((x) => x.stream_rank != null)
+    // The heading states which order you are looking at. A list whose sort has been silently
+    // replaced is the failure mode here: the review clock is still on every card, so without
+    // this the operator could read a hand-ordered list as a due-date one.
+    const orderCtl = []
+    if (isRanked) {
+      const reset = mkBtn("reset to review date", "btn-snooze mini", async () => {
+        try { await api("clear_task_order", { proposition_id: p.id }) }
+        catch (e) { alert("Could not reset the order.\n\n" + e.message) }
+        openProposition(p.id)
+      })
+      reset.style.marginTop = "0"
+      reset.title = "Clear the manual order for this stream and go back to sorting by review date"
+      orderCtl.push(reset)
+    }
+    host.appendChild(propSection(
+      "Tasks · " + (isRanked ? "your order" : "by review date"), orderCtl, 3))
     // Terminal tasks are hidden from the lanes by default (Day 140, from first-use feedback:
     // "all abandoned tasks still show and pollute the screen"). `get_proposition` returns every
     // task regardless of status — read live, it has no status filter — and on a worked
@@ -3623,17 +3946,34 @@
     // workspace gets moved from the screen where you actually notice it.
     // get_proposition already orders review_at asc nulls last, so the due ones lead; the rule
     // just marks where they stop, matching the "Due for review" group on the Tasks tab.
+    //
+    // The rule is drawn ONLY while the stream is on the clock. In a hand-ordered stream "not yet
+    // due" no longer marks a boundary — due and undue work is interleaved wherever the operator
+    // put it — so a rule there would divide the list at an arbitrary point and assert a grouping
+    // that is not real. The per-card review chip still says which tasks are due; that reading
+    // moves onto the cards rather than disappearing.
     let ruled = false
     for (const t of lane) {
-      if (!ruled && !isDue(t) && lane.some(isDue)) {
+      if (!isRanked && !ruled && !isDue(t) && lane.some(isDue)) {
         const r = document.createElement("div"); r.className = "hint"
         r.style.cssText = "border-top:1px solid var(--line);margin:10px 0 8px;padding-top:6px"
         r.textContent = "not yet due"
         hz.appendChild(r); ruled = true
       }
-      hz.appendChild(taskCard(t, { bulk: false }))
+      // Open tasks are draggable; retired ones are rendered plainly. A completed task has no
+      // position to hold — it carries no rank and no clock, so it sorts below the live work
+      // whatever the operator does above it.
+      hz.appendChild(t.status === "open"
+        ? taskDragRow(p, t, (ids) => persistTaskOrder(p, ids))
+        : taskCard(t, { bulk: false }))
     }
     host.appendChild(hz)
+    if (liveTasks.length > 1) {
+      const g = document.createElement("p"); g.className = "hint"; g.style.marginTop = "8px"
+      g.innerHTML = '<span style="color:var(--ink-faint)">⠿</span> drag a task by its grip to set '
+        + "the order you intend to work in" + (isRanked ? "" : " — the list is on the review clock until you do")
+      host.appendChild(g)
+    }
     if (doneTasks.length) {
       const byStatus = {}
       for (const t of doneTasks) byStatus[t.status] = (byStatus[t.status] || 0) + 1
@@ -3644,14 +3984,14 @@
       host.appendChild(tog)
     }
 
-    // Review description / Restructure tasks / Fold a thesis all moved to the ACT row at the
-    // top (Day 141). They are still a two-step flow — step 2 reads whatever step 1 wrote to
-    // the description — and both still render unconditionally, so the server stays the single
-    // holder of the "needs 2+ open tasks" rule and the client grows no second copy of it.
+    // Review description and Restructure tasks are still a two-step flow — step 2 reads whatever
+    // step 1 wrote to the description — and both still render unconditionally, so the server
+    // stays the single holder of the "needs 2+ open tasks" rule and the client grows no second
+    // copy of it.
 
-    // folded theses
+    // folded theses — the last of the WHAT: material that came into this stream from the feed.
     host.appendChild(propSection("Theses folded in · " + p.theses.length))
-    if (!p.theses.length) { const e = document.createElement("div"); e.className = "hint"; e.textContent = "none — use “Fold a pending thesis” above to enrich this proposition"; host.appendChild(e) }
+    if (!p.theses.length) { const e = document.createElement("div"); e.className = "hint"; e.textContent = "none — use “Fold a pending thesis” below to enrich this stream"; host.appendChild(e) }
     for (const th of p.theses) {
       const row = document.createElement("div"); row.className = "pending-card"
       const a = document.createElement("div"); a.style.fontSize = "13.5px"; a.textContent = th.suggested_action; row.appendChild(a)
@@ -3659,6 +3999,14 @@
       m.textContent = th.status + (th.fit_flag ? " · " + th.fit_flag : ""); row.appendChild(m)
       host.appendChild(row)
     }
+
+    // ── THEN WHAT TO DO ABOUT THE STREAM ─────────────────────────────────────
+    // Built at the top of this function, appended here. Everything that acts on the stream as a
+    // whole — reshape it, read its history, declare its outcome — sits after the reading it is
+    // a response to, under one rule that separates acting from reading.
+    host.appendChild(propSection("This stream"))
+    host.appendChild(act); host.appendChild(actSlot)
+    host.appendChild(life); host.appendChild(lnSlot)
   }
 
   // One stakeholder, one row. Every stage is present as a tag; the current one is filled and
@@ -4416,6 +4764,13 @@
   }
 
   $("unlockBtn").addEventListener("click", unlock)
+  // Day 145 · the strip expands in place rather than opening a panel or a tab. It is a reading
+  // about the console, not a place in it, so it must not become a sixth destination in the nav.
+  $("loopHealthLine").addEventListener("click", () => {
+    const panel = $("loopHealthPanel")
+    panel.classList.toggle("hidden")
+    renderLoopHealth()
+  })
   $("token").addEventListener("keydown", (e) => { if (e.key === "Enter") unlock() })
   $("addPersonBtn").addEventListener("click", addPerson)
   $("addNoteBtn").addEventListener("click", addNote)
