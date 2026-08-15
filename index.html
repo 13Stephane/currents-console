@@ -517,7 +517,7 @@
            This comment deliberately does NOT repeat the token: the script's first real run
            replaced it here as well as below, and its own 2-line guard caught the double
            substitution. Any second copy of that literal in this file breaks publishing. -->
-      <span class="build">build 69fb0b4 · 2026-08-15</span>
+      <span class="build">build e5dc8f9 · 2026-08-15</span>
     </span>
   </div>
 
@@ -3886,27 +3886,47 @@
       + "color:var(--ink-dim);cursor:grab;padding:13px 6px 0;user-select:none;line-height:1"
     grip.addEventListener("mouseenter", () => { grip.style.color = "var(--gold)" })
     grip.addEventListener("mouseleave", () => { grip.style.color = "var(--ink-dim)" })
+    // THE GRIP is the draggable element, permanently — not the row, and not flipped on
+    // mousedown.
+    //
+    // It was `row.draggable = true` set inside the grip's mousedown handler, to keep the card's
+    // prose selectable while still restricting the drag to the handle. That flips `draggable`
+    // in the middle of the gesture, and only Chromium re-reads it there: WebKit resolves
+    // draggability when the drag starts, sees `false`, and never fires `dragstart` at all. The
+    // console renders identically and the drag is simply inert.
+    //
+    // It survived every test because the tests dispatched `new DragEvent("dragstart")`
+    // directly, and a synthetic event fires whatever the `draggable` attribute says. The
+    // handlers were proven; the gesture that reaches them never was.
+    //
+    // Making the grip itself draggable gets both properties without the flip: the card's text
+    // stays selectable because the card is not the drag source, and no attribute changes
+    // mid-gesture. setDragImage keeps the row as the thing you see moving, so a 15px glyph is
+    // not what follows the cursor.
+    grip.draggable = true
     row.appendChild(grip)
 
     const body = document.createElement("div"); body.style.cssText = "flex:1;min-width:0"
     body.appendChild(taskCard(t, cardOpts))
     row.appendChild(body)
 
-    // draggable is turned on only while the grip is held. Left permanently on, the browser
-    // treats a text selection inside the card as the start of a drag, which makes reading a
-    // task's prose feel like it is about to move it.
-    grip.addEventListener("mousedown", () => { row.draggable = true; grip.style.cursor = "grabbing" })
-    const release = () => { row.draggable = false; grip.style.cursor = "grab" }
+    const release = () => { grip.style.cursor = "grab" }
+    grip.addEventListener("mousedown", () => { grip.style.cursor = "grabbing" })
     grip.addEventListener("mouseup", release)
 
-    row.addEventListener("dragstart", (e) => {
+    // Bound to the GRIP, since the grip is the drag source now.
+    grip.addEventListener("dragstart", (e) => {
       DRAG_TASK_ID = t.id; DRAG_TASK_EL = row
       e.dataTransfer.effectAllowed = "move"
       // Firefox refuses to start a drag without payload; the id is also the honest payload.
       try { e.dataTransfer.setData("text/plain", t.id) } catch (_) {}
+      // Drag the ROW's likeness, not the handle's — otherwise a 15px glyph is what follows the
+      // cursor and there is no sense of which task is moving. Guarded: setDragImage is absent
+      // in some engines and its absence must not abort the drag.
+      try { e.dataTransfer.setDragImage(row, 24, 24) } catch (_) {}
       row.style.opacity = ".45"
     })
-    row.addEventListener("dragend", () => {
+    grip.addEventListener("dragend", () => {
       row.style.opacity = ""; release(); clearDropMarks(row.parentNode)
       DRAG_TASK_ID = null; DRAG_TASK_EL = null
     })
