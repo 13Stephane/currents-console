@@ -517,7 +517,7 @@
            This comment deliberately does NOT repeat the token: the script's first real run
            replaced it here as well as below, and its own 2-line guard caught the double
            substitution. Any second copy of that literal in this file breaks publishing. -->
-      <span class="build">build e5dc8f9 · 2026-08-15</span>
+      <span class="build">build 8a3324b · 2026-08-15</span>
     </span>
   </div>
 
@@ -840,17 +840,30 @@
            ways of changing one list were on two different levels. Nothing is pushed apart. -->
       <h2 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Do Next<a class="fnmark" href="#fn-task-1">1</a>
         <button class="ghost mini" id="tasksRefresh">refresh</button>
-        <span class="nav subnav" id="taskSortNav" style="margin:0;gap:6px;align-items:center">
-          <span class="hint" style="margin:0 4px 0 6px">order</span>
-          <button data-tsort="recent" class="active" title="Most recently updated first, grouped by stream">Recent</button>
+        <!-- Day 145 · the three order toggles are ghost pills, not `nav subnav` text.
+             THE BUG THEY CAUSED, reported live: the operator could not switch to the hand order
+             because these did not read as things you click. On a heading line where `refresh`,
+             `show resolved`, `reassign` and `+ task` are all bordered pills, three borderless
+             dim words after a dim "order" label read as one caption — a description of the list
+             rather than a control over it. Confirmed by the operator's own console output:
+             activeSort was ["Recent"] and dragRows 0 the whole time, so the feature was never
+             entered, and every explanation about drag mechanics was answering a question nobody
+             was in a position to ask yet.
+             Day 143 already made this call for `show resolved`, and its comment says the new
+             pill matches "the Recent/Ranked toggles" — which it did not, because those stayed
+             text. This finishes that change instead of leaving one row in two idioms.
+             aria-pressed, like the other two toggles, so the state is real and not just gold. -->
+        <span id="taskSortNav" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <span class="hint" style="margin:0 2px 0 4px">order</span>
+          <button class="ghost mini" data-tsort="recent" aria-pressed="true" title="Most recently updated first, grouped by stream">Recent</button>
           <!-- Renamed from "Do next" Day 142: the tab now carries that name, and a sort option
                sharing it read as a way to get back to the tab you were already on. -->
-          <button data-tsort="donext" title="One ranked list across every stream, oldest-pressing first">Ranked</button>
+          <button class="ghost mini" data-tsort="donext" aria-pressed="false" title="One ranked list across every stream, oldest-pressing first">Ranked</button>
           <!-- Day 145 · the hand order. A third MODE, not a modifier on the other two: Recent
                and Ranked both lift due work to the top, and a lift moves rows the operator just
                placed. Here nothing is lifted and nothing is grouped — one list, in your order,
                with the review chip on each card carrying the due reading instead. -->
-          <button data-tsort="manual" title="Your own order, set by dragging. One flat list, nothing lifted or grouped">Mine</button>
+          <button class="ghost mini" data-tsort="manual" aria-pressed="false" title="Your own order, set by dragging. Drag the ⠿ handle at the left of each card">Mine</button>
         </span>
         <!-- Day 143: was a checkbox, which the global `input` rule stretched into a large empty
              box with its label pushed away from it. It is also not a form field — it changes
@@ -3201,7 +3214,14 @@
 
   function paintTaskSortNav() {
     const nav = $("taskSortNav"); if (!nav) return
-    nav.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.tsort === TASK_SORT))
+    nav.querySelectorAll("button").forEach((b) => {
+      const on = b.dataset.tsort === TASK_SORT
+      // `.ghost.active` is the console's existing pressed look (gold fill), and aria-pressed is
+      // what assistive tech reads — the same pair `show resolved` and `reassign` already use.
+      // Both, not one: the class alone leaves the state invisible to anything but an eye.
+      b.classList.toggle("active", on)
+      b.setAttribute("aria-pressed", String(on))
+    })
   }
   const HORIZON_RANK = { now: 3, next: 2, later: 1 }
   function doNextScore(t) {
@@ -4137,6 +4157,54 @@
     // replaced is the failure mode here: the review clock is still on every card, so without
     // this the operator could read a hand-ordered list as a due-date one.
     const orderCtl = []
+    // Day 145 · write a task straight into THIS stream.
+    //
+    // add_task and its proposition_id have existed since Day 143, but the only way to reach
+    // them was the "+ task" button on Do Next, followed by picking this stream out of a
+    // dropdown — from a screen that is not the stream. Standing inside a stream, looking at its
+    // tasks, there was no way to add one. v_feature_exercise reads `task_manual` as NEVER USED
+    // across the whole estate, and a create path you can only reach from somewhere else is a
+    // large part of why. Same op, same RPC; the stream is implied by where you are standing
+    // rather than re-selected from a list.
+    const addTaskSlot = document.createElement("div")
+    const addTaskBtn = mkBtn("+ task", "btn-edit mini", () => {
+      if (addTaskSlot.dataset.open === "1") { addTaskSlot.innerHTML = ""; addTaskSlot.dataset.open = "0"; return }
+      addTaskSlot.dataset.open = "1"
+      addTaskSlot.innerHTML = ""
+      const box = document.createElement("div"); box.className = "inline-edit"; box.style.margin = "10px 0"
+      const lab = document.createElement("label"); lab.textContent = "What needs doing?"; box.appendChild(lab)
+      const ta = document.createElement("textarea"); ta.rows = 2
+      ta.placeholder = "Send the revised scope to…"; box.appendChild(ta)
+      const dlab = document.createElement("label"); dlab.textContent = "Review in (days)"; box.appendChild(dlab)
+      const days = document.createElement("input"); days.type = "number"; days.min = "1"; days.max = "365"
+      days.value = "14"; box.appendChild(days)
+      const acts = document.createElement("div"); acts.className = "acts"
+      const out = document.createElement("div"); out.className = "out"
+      const save = mkBtn("Add task", "btn-accept mini", async () => {
+        const action = ta.value.trim()
+        if (!action) { show(out, "A task needs an action.", false); return }
+        save.disabled = true
+        try {
+          await api("add_task", {
+            current_action: action,
+            proposition_id: p.id,
+            review_days: Math.max(1, Math.min(365, Number(days.value) || 14)),
+          })
+          // Re-read rather than splice the new row in locally (L57): the pane shows what
+          // get_proposition returns, including where the review clock actually put it.
+          openProposition(p.id)
+        } catch (e) { show(out, e.message, false); save.disabled = false }
+      })
+      save.style.marginTop = "0"
+      const cancel = mkBtn("cancel", "btn-snooze mini", () => { addTaskSlot.innerHTML = ""; addTaskSlot.dataset.open = "0" })
+      cancel.style.marginTop = "0"
+      acts.appendChild(save); acts.appendChild(cancel); box.appendChild(acts); box.appendChild(out)
+      addTaskSlot.appendChild(box)
+      ta.focus()
+    })
+    addTaskBtn.style.marginTop = "0"
+    addTaskBtn.title = "Write a task into this stream — no thesis, no model claim, nothing to calibrate"
+    orderCtl.push(addTaskBtn)
     if (isRanked) {
       const reset = mkBtn("reset to review date", "btn-snooze mini", async () => {
         try { await api("clear_task_order", { proposition_id: p.id }) }
@@ -4149,6 +4217,8 @@
     }
     host.appendChild(propSection(
       "Tasks · " + (isRanked ? "your order" : "by review date"), orderCtl, 3))
+    // The form opens directly under the rule that carries its button, above the list it adds to.
+    host.appendChild(addTaskSlot)
     // Terminal tasks are hidden from the lanes by default (Day 140, from first-use feedback:
     // "all abandoned tasks still show and pollute the screen"). `get_proposition` returns every
     // task regardless of status — read live, it has no status filter — and on a worked
