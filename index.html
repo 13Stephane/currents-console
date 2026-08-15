@@ -517,7 +517,7 @@
            This comment deliberately does NOT repeat the token: the script's first real run
            replaced it here as well as below, and its own 2-line guard caught the double
            substitution. Any second copy of that literal in this file breaks publishing. -->
-      <span class="build">build 4bf31db · 2026-08-15</span>
+      <span class="build">build 69fb0b4 · 2026-08-15</span>
     </span>
   </div>
 
@@ -3163,6 +3163,13 @@
       ])
       TASK_PROPS = pr.propositions || []
       TASKS_CACHE = r.tasks || []
+      // Land on the hand order if there is one and the operator has not said otherwise. Keyed
+      // on the DATA, not on a stored preference: the order's existence is the preference, and
+      // it cannot drift out of sync with the rows the way a separate setting would.
+      if (!TASK_SORT_CHOSEN && TASKS_CACHE.some((t) => t.do_next_rank != null)) {
+        TASK_SORT = "manual"
+        paintTaskSortNav()
+      }
       paintDueBadge(TASKS_CACHE)
       renderTasks(TASKS_CACHE)
     } catch (e) { host.textContent = e.message }
@@ -3182,6 +3189,20 @@
   // as it ages. v1 uses only signals on the task itself; expiring-thesis / stakeholder-stage /
   // fit are the tunable next layer (they need a list_tasks join — held for a server pass).
   let TASK_SORT = "recent", TASKS_CACHE = []
+  // Day 145 · has the OPERATOR picked a sort this session?
+  //
+  // The tab opens on Recent until a hand order exists, then opens on Mine — an order you took
+  // the trouble to set is the order you meant to work in, and making you re-select it every
+  // visit is the same "discoverable rather than unavoidable" defect the due badge was built to
+  // fix on Day 141. But an explicit click must win: without this flag the next refresh would
+  // drag you back to Mine every time you deliberately chose Recent, which is a view that
+  // fights you.
+  let TASK_SORT_CHOSEN = false
+
+  function paintTaskSortNav() {
+    const nav = $("taskSortNav"); if (!nav) return
+    nav.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.tsort === TASK_SORT))
+  }
   const HORIZON_RANK = { now: 3, next: 2, later: 1 }
   function doNextScore(t) {
     const h = HORIZON_RANK[t.horizon] ?? 1.5              // unset sits between next and later
@@ -3852,11 +3873,19 @@
     row.dataset.tid = t.id
     row.style.cssText = "display:flex;align-items:flex-start;gap:8px"
 
+    // Day 145 (same day, from first use): the grip shipped at var(--ink-faint) — 32% opacity,
+    // default size, outside the card's border — and the operator could not find it. "Quiet"
+    // was the intent and "invisible" was the result: a control nobody can see is not a subtle
+    // control, it is a missing one. The affordance is the ONLY way to express this order, so it
+    // has to be findable before it can be unobtrusive.
+    //   ink-dim (62%) at 15px, gold on hover, and a wider hit area than the glyph.
     const grip = document.createElement("span")
     grip.textContent = "⠿"
     grip.title = "Drag to reorder"
-    grip.style.cssText = "font-family:'IBM Plex Mono',monospace;color:var(--ink-faint);"
-      + "cursor:grab;padding:14px 2px 0;user-select:none;line-height:1"
+    grip.style.cssText = "font-family:'IBM Plex Mono',monospace;font-size:15px;"
+      + "color:var(--ink-dim);cursor:grab;padding:13px 6px 0;user-select:none;line-height:1"
+    grip.addEventListener("mouseenter", () => { grip.style.color = "var(--gold)" })
+    grip.addEventListener("mouseleave", () => { grip.style.color = "var(--ink-dim)" })
     row.appendChild(grip)
 
     const body = document.createElement("div"); body.style.cssText = "flex:1;min-width:0"
@@ -5553,7 +5582,9 @@
   // Day 129 (#5): Tasks "Recent" vs "Do next" ordering — re-renders from cache, no refetch.
   $("taskSortNav").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
     TASK_SORT = b.dataset.tsort
-    $("taskSortNav").querySelectorAll("button").forEach((x) => x.classList.toggle("active", x === b))
+    // An explicit choice pins the view for the session — see TASK_SORT_CHOSEN.
+    TASK_SORT_CHOSEN = true
+    paintTaskSortNav()
     renderTasks(TASKS_CACHE)
   }))
   // Day 143 · footnote markers. Delegated on the document, because most of them are minted
