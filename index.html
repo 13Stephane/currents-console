@@ -846,6 +846,11 @@
           <!-- Renamed from "Do next" Day 142: the tab now carries that name, and a sort option
                sharing it read as a way to get back to the tab you were already on. -->
           <button data-tsort="donext" title="One ranked list across every stream, oldest-pressing first">Ranked</button>
+          <!-- Day 145 · the hand order. A third MODE, not a modifier on the other two: Recent
+               and Ranked both lift due work to the top, and a lift moves rows the operator just
+               placed. Here nothing is lifted and nothing is grouped — one list, in your order,
+               with the review chip on each card carrying the due reading instead. -->
+          <button data-tsort="manual" title="Your own order, set by dragging. One flat list, nothing lifted or grouped">Mine</button>
         </span>
         <!-- Day 143: was a checkbox, which the global `input` rule stretched into a large empty
              box with its label pushed away from it. It is also not a form field — it changes
@@ -906,6 +911,7 @@
         <li id="fn-task-2"><strong>Due for review.</strong> Past their review date. Each wants one of three answers: Complete (did it), Abandon (dropped it), or Still live (neither — push the date out). Renewing is recorded, so declining to close is a signal rather than silence.</li>
         <li id="fn-task-3"><strong>Ranked.</strong> One ranked list across every stream, oldest-pressing first. Use “Still live” to push a task's review date out.</li>
         <li id="fn-task-4"><strong>Unassigned.</strong> Standalone tasks, not tied to any stream. Legitimate for one-off relationship maintenance — or file one into a stream with the picker.</li>
+        <li id="fn-task-5"><strong>Mine — your own order.</strong> One flat list you arrange by dragging. Nothing is lifted to the top and nothing is grouped, because both would move rows you just placed; the review chip on each card still says what is due. Work spawned since your last drag is unplaced and waits at the bottom, and the count says how many. <strong>This order is separate from a stream's order.</strong> They answer different questions — what to work on today, versus what order a single stream runs in — so neither rewrites the other, and “reset my order” clears only this one.</li>
       </ol>
     </div>
     </div><!-- /tasksView -->
@@ -919,27 +925,38 @@
            tag is actually in front of you. Day 143 took the last paragraph the same way; the
            glossary STAYS in the rail rather than moving here, because it is read against a
            tag you are looking at, not read once. -->
-      <h2 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">News<a class="fnmark" href="#fn-news-1">1</a>
+      <!-- Day 142 put state and sort on one row. Day 145 puts the heading, `sources`, state and
+           sort ALL on that row — one line for one list. They were a heading line and a control
+           line, which spent a second row of height to separate a title from the controls that
+           act on the thing it titles. Nothing is dropped and nothing is reordered within each
+           group; the rules that already separated state from sort now also separate them from
+           `sources`, so the three groups stay legible at one glance. -->
+      <!-- No inline flex-wrap: the #newsControls rule above sets nowrap + overflow-x, which is
+           the Day-142 decision that one set of filters must never read as two rows. An inline
+           `wrap` here would beat that rule and quietly undo it. -->
+      <h2 id="newsControls" style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <span>News<a class="fnmark" href="#fn-news-1">1</a></span>
         <!-- Day 143 · the reader D-143 specified and never built. Same toggle idiom as
              Streams' "+ new" / "merge": a place you open, not a tab you leave News for. -->
-        <button class="ghost mini" id="sourcesToggle" style="margin-left:6px">sources</button>
-      </h2>
-      <!-- Day 142: state and sort on ONE row. They were two stacked navs, which read as two
-           levels of filtering when they are one list changed two ways. -->
-      <div class="nav subnav" id="newsControls" style="margin-bottom:4px;align-items:center;gap:8px">
-        <span id="newsStateNav" style="display:contents">
+        <button class="ghost mini" id="sourcesToggle">sources</button>
+        <!-- The two groups keep their own `nav subnav` wrappers rather than the h2 carrying the
+             class: `.nav button` (0,1,1) outranks `.ghost` (0,1,0), so a `nav` on the heading
+             would restyle `sources` into a tab — a button that opens a panel would come to look
+             like a place you navigate to. Same construction as the Do Next heading. -->
+        <span class="hint" style="margin:0 0 0 4px;border-left:1px solid var(--line);padding-left:12px">show</span>
+        <span class="nav subnav" id="newsStateNav" style="margin:0;gap:6px;align-items:center">
           <button data-state="eligible" class="active">Eligible</button>
           <button data-state="held">Held</button>
           <button data-state="parked">Parked</button>
           <button data-state="all">All</button>
         </span>
-        <span class="hint" style="margin:0 4px 0 10px;border-left:1px solid var(--line);padding-left:14px">sort</span>
-        <span id="newsSortNav" style="display:contents">
+        <span class="hint" style="margin:0 0 0 4px;border-left:1px solid var(--line);padding-left:12px">sort</span>
+        <span class="nav subnav" id="newsSortNav" style="margin:0;gap:6px;align-items:center">
           <button data-sort="balanced" class="active" title="Fit × freshness — most relevant from recent days">Balanced</button>
           <button data-sort="relevance" title="Pure fit score, ignores age">Relevance</button>
           <button data-sort="newest" title="Most recently observed first">Newest</button>
         </span>
-      </div>
+      </h2>
       <!-- The sweep list, with what each feed has actually yielded. Collapsed by default:
            this answers a weekly question ("is this feed earning its place"), not the daily
            one the tab exists for. -->
@@ -969,15 +986,16 @@
     </div><!-- /newsView -->
 
     <div id="propositionsView" class="hidden">
-    <div class="panel">
-      <!-- Day 141: the three controls sit on the heading line. They were a button plus two
-           <summary> rows stacked underneath, which read as three different kinds of thing
-           when they are three ways to change the same list. -->
-      <h2 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:0">Streams<a class="fnmark" href="#fn-stream-1">1</a>
-        <button class="ghost mini" id="propRefresh" style="margin-left:6px">refresh</button>
-        <button class="ghost mini" id="propNewToggle">+ new</button>
-        <button class="ghost mini" id="propMergeToggle">merge</button>
-      </h2>
+    <!-- Day 145 · the panel header is gone; refresh / + new / merge moved onto the LEFT RAIL's
+         own header, next to the count they act on.
+         Day 141 had put the three controls on an <h2> in a panel of their own above the split.
+         That panel then said "Streams · 6" while the rail beneath it said "STREAMS · 6" — one
+         heading, one count, twice, on two levels, with a full panel of chrome between the
+         operator and the list. The controls belong to the list, so they now sit on the list.
+         This wrapper survives only to hold the two forms those buttons open; it carries the
+         `panel` class ONLY while one of them is showing (see togglePropBox), so a closed state
+         costs no border, no padding and no vertical space. -->
+    <div id="propBoxes" class="hidden">
       <div id="propNewBox" class="hidden">
         <div style="margin-top:8px">
           <label>Title *</label><input id="p_title" placeholder="Reinventing Finance with AI">
@@ -2235,20 +2253,25 @@
   // Review-cadence nudge (Day 102) — mirror the daily-brief banner at the surface
   // where disposition actually happens. Computed from the full pending set (SUGS),
   // independent of the ◈ asset filter, so it always reflects the true queue + TTL.
+  // Day 145 · the banner now says only what nothing else on the tab says.
+  //
+  // It used to render "📋 5 awaiting your decision." above a left column headed "Pending · 5".
+  // The same count, twice, a hundred pixels apart, and the banner version carried no action —
+  // a full-width bar restating the number in the list header. Restating a count does not make
+  // it more urgent; it just moves the list down the page.
+  //
+  // What was NOT duplicated is expiry: nothing else on this tab says a thesis dies in 24 hours,
+  // and that one IS a deadline the operator cannot read off "Pending · 5". So the urgent form
+  // survives, minus its redundant tail, and the calm form is gone entirely. A banner that shows
+  // up only when something is actually about to be lost is a banner that gets read.
   function renderReviewBanner() {
     const el = $("reviewBanner"); if (!el) return
-    const total = SUGS.length
-    if (total === 0) { el.className = "review-banner hidden"; return }
+    if (!SUGS.length) { el.className = "review-banner hidden"; return }
     const expiring = SUGS.filter((s) => s.expires_at && new Date(s.expires_at).getTime() <= Date.now() + 24 * 3600 * 1000).length
-    if (expiring > 0) {
-      el.className = "review-banner urgent"
-      el.innerHTML = '⏳ <span class="rb-strong">' + expiring + ' expire' + (expiring === 1 ? 's' : '') +
-        ' within 24h</span> — review today or ' + (expiring === 1 ? 'it is' : 'they are') +
-        ' lost. · ' + total + ' awaiting your decision.'
-    } else {
-      el.className = "review-banner"
-      el.innerHTML = '📋 <span class="rb-strong">' + total + '</span> awaiting your decision.'
-    }
+    if (!expiring) { el.className = "review-banner hidden"; el.innerHTML = ""; return }
+    el.className = "review-banner urgent"
+    el.innerHTML = '⏳ <span class="rb-strong">' + expiring + ' expire' + (expiring === 1 ? 's' : '') +
+      ' within 24h</span> — review today or ' + (expiring === 1 ? 'it is' : 'they are') + ' lost.'
   }
 
   // Day 129: the initiative-filter banner — shows which initiative the feed is scoped to, with
@@ -3255,10 +3278,93 @@
     }
   }
 
+  // ── Day 145 · the hand-ordered Do Next list ─────────────────────────────────
+  //
+  // Same grip-and-drop as the Streams pane, a DIFFERENT column underneath. do_next_rank orders
+  // one flat list across every stream; tasks.stream_rank orders one stream. Neither is derivable
+  // from the other and neither write touches the other — see 20260815140000 for why reusing
+  // stream_rank here would have corrupted the Streams pane whenever a due task was lifted out of
+  // its group and a subset of the stream got sent.
+  //
+  // Only OPEN tasks are placed. With "show resolved" on, terminal rows render below the ordered
+  // list, plainly and undraggable: a completed task has no position in what to do next.
+  function renderManualTasks(host, tasks) {
+    const open = tasks.filter((t) => t.status === "open")
+    const done = tasks.filter((t) => t.status !== "open")
+    // nulls last, then the clock. An unplaced task is new work that arrived after the last drag,
+    // and the bottom is where it belongs until the operator says otherwise.
+    const ordered = open.slice().sort((a, b) => {
+      const ar = a.do_next_rank == null ? Infinity : a.do_next_rank
+      const br = b.do_next_rank == null ? Infinity : b.do_next_rank
+      if (ar !== br) return ar - br
+      const at = a.review_at ? new Date(a.review_at).getTime() : Infinity
+      const bt = b.review_at ? new Date(b.review_at).getTime() : Infinity
+      if (at !== bt) return at - bt
+      return new Date(a.created_at || 0) - new Date(b.created_at || 0)
+    })
+    const placed = ordered.filter((t) => t.do_next_rank != null).length
+    const unplaced = ordered.length - placed
+
+    const head = document.createElement("div")
+    head.style.cssText = "display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:18px 0 8px;"
+      + "border-bottom:1px solid var(--line);padding-bottom:4px"
+    const hl = document.createElement("div"); hl.className = "hint"
+    hl.style.cssText = "text-transform:uppercase;letter-spacing:.12em;color:var(--ink-faint);margin:0"
+    hl.textContent = "Your order · " + ordered.length
+    head.appendChild(hl)
+    const fn = document.createElement("a"); fn.className = "fnmark"
+    fn.href = "#fn-task-5"; fn.textContent = "5"; head.appendChild(fn)
+    if (placed) {
+      const reset = mkBtn("reset my order", "btn-snooze mini", async () => {
+        try { await api("clear_do_next_order", {}) }
+        catch (e) { alert("Could not reset the order.\n\n" + e.message) }
+        loadTasks()
+      })
+      reset.style.cssText = "margin:0 0 0 auto;padding:3px 9px;font-size:10.5px"
+      reset.title = "Clear your Do Next order. Stream orders are untouched — they are a different column."
+      head.appendChild(reset)
+    }
+    host.appendChild(head)
+
+    // Stated, not implied. A list that silently grows a tail of unplaced work is a list the
+    // operator stops trusting the moment they notice the tail.
+    const note = document.createElement("p"); note.className = "hint"; note.style.margin = "0 0 10px"
+    note.innerHTML = '<span style="color:var(--ink-faint)">⠿</span> drag by the grip to set your order'
+      + (unplaced
+        ? ' · <span style="color:var(--gold)">' + unplaced + " not yet placed</span>, sitting at the bottom"
+        : "")
+      + " · this order is yours alone and does not change any stream's order"
+    host.appendChild(note)
+
+    const lane = document.createElement("div")
+    for (const t of ordered) {
+      lane.appendChild(taskDragRow(t, (ids) => persistDoNextOrder(ids)))
+    }
+    host.appendChild(lane)
+
+    if (done.length) {
+      host.appendChild(taskGroupHeader("Resolved · " + done.length, null))
+      for (const t of done) host.appendChild(taskCard(t))
+    }
+  }
+
+  async function persistDoNextOrder(ids) {
+    try {
+      await api("set_do_next_order", { task_ids: ids })
+    } catch (e) {
+      alert("Reorder failed — nothing was moved.\n\n" + e.message)
+    }
+    // Re-read either way (L57). The list shows what the database holds, not what the drag did.
+    loadTasks()
+  }
+
   function renderTasks(tasks) {
     const host = $("tasksList"); host.innerHTML = ""
     renderTaskSelBar()
     if (!tasks.length) { host.innerHTML = '<p class="hint">No tasks. Accept or edit a suggestion in Dispose to spawn one.</p>'; return }
+    // The hand order returns before every grouping below it — that is the mode, not a variant
+    // of it. Due work is NOT lifted here on purpose: lifting moves rows the operator placed.
+    if (TASK_SORT === "manual") { renderManualTasks(host, tasks); return }
     // Due work leads, in BOTH modes and ahead of every other grouping. A task past its review
     // date is not one more item in a list — it is the only thing the console is asking you to
     // answer, and it was previously reachable only by reading chips card by card.
@@ -3498,6 +3604,28 @@
   // the upper one in the same repaint, or the column contradicts itself.
   let PROP_FLOATERS = []
 
+  // Day 145 · which of the two stream forms is open ("new" | "merge" | null). The toggles that
+  // set it are rebuilt with the rail on every load, so the truth cannot live on a button.
+  let PROP_BOX_OPEN = null
+
+  // Repaints the toggles and the wrapper. The wrapper takes the `panel` class only while a form
+  // is showing: an empty panel above the split is a border and 40px of padding around nothing,
+  // which is exactly the chrome this move set out to remove.
+  function paintPropBoxToggles() {
+    const wrap = $("propBoxes"); if (!wrap) return
+    const boxes = { new: $("propNewBox"), merge: $("mergePicker") }
+    for (const k of Object.keys(boxes)) {
+      if (boxes[k]) boxes[k].classList.toggle("hidden", PROP_BOX_OPEN !== k)
+    }
+    wrap.classList.toggle("hidden", PROP_BOX_OPEN === null)
+    wrap.classList.toggle("panel", PROP_BOX_OPEN !== null)
+    // The buttons exist only once the rail has rendered; before that this is a no-op, which is
+    // correct — there is nothing on screen to be out of sync with.
+    const nb = $("propNewToggle"), mb = $("propMergeToggle")
+    if (nb) nb.classList.toggle("active", PROP_BOX_OPEN === "new")
+    if (mb) mb.classList.toggle("active", PROP_BOX_OPEN === "merge")
+  }
+
   async function loadPropositions() {
     const host = $("propRail"); host.innerHTML = '<p class="empty">loading…</p>'
     try {
@@ -3538,9 +3666,35 @@
     const host = $("propRail"); host.innerHTML = ""
     const props = allProps.filter(isOpenStream)
     const retired = allProps.filter((p) => !isOpenStream(p))
-    const ph = document.createElement("div"); ph.className = "col-h"; ph.style.paddingTop = "14px"
-    ph.textContent = "Streams · " + props.length
+    // Day 145 · the rail header carries the list's own controls.
+    //
+    // refresh / + new / merge used to live on an <h2> in a panel above the split, which also
+    // printed "Streams" and the same count this line prints — the heading and its number said
+    // twice, on two levels, with a panel's worth of chrome in between. They act on THIS list, so
+    // they sit on it. `display:flex` with the count on the left and the controls pushed right
+    // keeps the count where the eye already looks for it in every other col-h on the page.
+    const ph = document.createElement("div"); ph.className = "col-h"
+    ph.style.cssText = "padding-top:14px;display:flex;align-items:center;gap:6px;flex-wrap:wrap"
+    const phLab = document.createElement("span"); phLab.textContent = "Streams · " + props.length
+    ph.appendChild(phLab)
+    const phFn = document.createElement("a"); phFn.className = "fnmark"
+    phFn.href = "#fn-stream-1"; phFn.textContent = "1"; ph.appendChild(phFn)
+    const phCtl = document.createElement("span")
+    phCtl.style.cssText = "margin-left:auto;display:flex;gap:4px;align-items:center"
+    // Built here rather than in the markup because this header is re-rendered on every load —
+    // so the buttons are wired here too, and paintPropBoxToggles() restores which one reads as
+    // open after the rebuild. A listener bound once at init would be lost on the first refresh.
+    const railBtn = (id, label, title, fn) => {
+      const b = document.createElement("button"); b.id = id; b.className = "ghost mini"
+      b.textContent = label; b.style.marginTop = "0"; if (title) b.title = title
+      b.addEventListener("click", fn); return b
+    }
+    phCtl.appendChild(railBtn("propRefresh", "refresh", "Re-read the stream list", loadPropositions))
+    phCtl.appendChild(railBtn("propNewToggle", "+ new", "Create a stream", () => togglePropBox("new")))
+    phCtl.appendChild(railBtn("propMergeToggle", "merge", "Fold two or more streams into one", () => togglePropBox("merge")))
+    ph.appendChild(phCtl)
     host.appendChild(ph)
+    paintPropBoxToggles()
     if (!props.length) {
       host.appendChild(Object.assign(document.createElement("p"),
         { className: "empty", textContent: "None yet — create one above." }))
@@ -3679,20 +3833,24 @@
   // draggable would put a second meaning on a surface that already has one.
   let DRAG_TASK_ID = null
 
-  function taskDragRow(p, t, onDrop) {
+  // cardOpts is passed straight through to taskCard. The Streams pane sends {bulk:false} because
+  // the selection bar those checkboxes report to lives on Do Next; Do Next sends nothing, so
+  // reassign mode keeps working there. The two never fight for the same gesture: selection is a
+  // click on the card, dragging is a press on the grip, and the grip is outside the card.
+  function taskDragRow(t, onDrop, cardOpts) {
     const row = document.createElement("div")
     row.dataset.tid = t.id
     row.style.cssText = "display:flex;align-items:flex-start;gap:8px"
 
     const grip = document.createElement("span")
     grip.textContent = "⠿"
-    grip.title = "Drag to reorder this task within the stream"
+    grip.title = "Drag to reorder"
     grip.style.cssText = "font-family:'IBM Plex Mono',monospace;color:var(--ink-faint);"
       + "cursor:grab;padding:14px 2px 0;user-select:none;line-height:1"
     row.appendChild(grip)
 
     const body = document.createElement("div"); body.style.cssText = "flex:1;min-width:0"
-    body.appendChild(taskCard(t, { bulk: false }))
+    body.appendChild(taskCard(t, cardOpts))
     row.appendChild(body)
 
     // draggable is turned on only while the grip is held. Left permanently on, the browser
@@ -3964,7 +4122,7 @@
       // position to hold — it carries no rank and no clock, so it sorts below the live work
       // whatever the operator does above it.
       hz.appendChild(t.status === "open"
-        ? taskDragRow(p, t, (ids) => persistTaskOrder(p, ids))
+        ? taskDragRow(t, (ids) => persistTaskOrder(p, ids), { bulk: false })
         : taskCard(t, { bulk: false }))
     }
     host.appendChild(hz)
@@ -5410,7 +5568,9 @@
   $("navNews").addEventListener("click", showNews)
   initNewsStateNav()
   initNewsSortNav()
-  $("propRefresh").addEventListener("click", loadPropositions)
+  // propRefresh / propNewToggle / propMergeToggle are created and wired inside renderPropRail
+  // (Day 145) — they live on the rail header now, which is rebuilt on every load, so binding
+  // them once here would leave dead buttons after the first refresh.
   $("rel_btn").addEventListener("click", runRelevance)
   $("rel_text").addEventListener("keydown", (e) => { if (e.key === "Enter") runRelevance() })
   $("p_createBtn").addEventListener("click", createProposition)
@@ -5418,18 +5578,16 @@
   // The two composers are now heading-line toggles rather than <details> (Day 141), so the
   // open/close state is a class. Opening one closes the other: they are alternatives, and two
   // long forms stacked above the list pushes the list itself off the screen.
+  // Which box is open is now module state rather than a class read off a button, because the
+  // buttons are destroyed and rebuilt with the rail on every load — reading the open state off
+  // a node that may not be the same node is how a toggle silently forgets itself.
   function togglePropBox(which) {
-    const boxes = { new: $("propNewBox"), merge: $("mergePicker") }
-    const opening = boxes[which].classList.contains("hidden")
-    for (const k of Object.keys(boxes)) boxes[k].classList.toggle("hidden", !(opening && k === which))
-    $("propNewToggle").classList.toggle("active", opening && which === "new")
-    $("propMergeToggle").classList.toggle("active", opening && which === "merge")
+    PROP_BOX_OPEN = PROP_BOX_OPEN === which ? null : which
+    paintPropBoxToggles()
     // Candidates load on first open of the picker, not on every visit to the tab — the op
     // reads three tables and the picker is closed most of the time.
-    if (opening && which === "merge" && !MG_CANDS.length) loadMergeCandidates()
+    if (PROP_BOX_OPEN === "merge" && !MG_CANDS.length) loadMergeCandidates()
   }
-  $("propNewToggle").addEventListener("click", () => togglePropBox("new"))
-  $("propMergeToggle").addEventListener("click", () => togglePropBox("merge"))
   $("mg_refreshBtn").addEventListener("click", loadMergeCandidates)
   $("mg_openBtn").addEventListener("click", openMergeComposer)
   $("mergeClose").addEventListener("click", closeMergeComposer)
