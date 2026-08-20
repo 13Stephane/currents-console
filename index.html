@@ -55,9 +55,23 @@
   #newsView > .panel { max-width: none; }
   #newsView > .panel > .hint { max-width: 760px; }
   #newsControls { flex-wrap: nowrap; overflow-x: auto; }
+  /* Day 146 · the nowrap above holds for the row's own children, but each filter GROUP is a
+     `.nav`, and `.nav` wraps. At phone width that folded "Eligible / Held / Parked / All"
+     into a four-line column and pushed the sort group past the right edge of a row whose
+     overflow is the only way back to it — the same "one set of filters must never read as
+     two" fault the nowrap was written to prevent, one level down. The row scrolls sideways
+     by design; the groups inside it have to say so too. */
+  #newsControls .nav { flex-wrap: nowrap; }
   /* The rail meta is a single scan line and must stay one line. A long feed name truncates
      rather than wrapping the score and state away from each other. */
-  .rmeta .src { display: inline-block; max-width: 190px; overflow: hidden;
+  /* Day 146 · the 190px cap alone kept the line one line only while the rail was 312px wide.
+     On a phone the rail is the full width of the screen minus its padding, and a feed name
+     plus a stream name plus the score and the state exceeded it — but a flex item's default
+     `min-width: auto` refuses to shrink below its own content, so instead of truncating
+     further the row spilled out past the edge of its card. `min-width: 0` lets the two
+     truncating spans give way, which is what the ellipsis was there for: the score and the
+     state — the two things you actually scan by — keep their place on one line at any width. */
+  .rmeta .src { display: inline-block; max-width: 190px; min-width: 0; overflow: hidden;
     text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
   .mono { font-family: "IBM Plex Mono", "SF Mono", ui-monospace, Menlo, monospace; }
   .head { display: flex; align-items: baseline; justify-content: space-between; gap: 18px;
@@ -226,7 +240,13 @@
   /* Two-pane reader: a scrolling list on the left, the selected object on the right.
      Used by Propositions and News; the three-column .split stays the Theses layout. */
   .split-2 { grid-template-columns: 336px minmax(0,1fr); }
-  @media (max-width: 940px) { .split, .split-2 { grid-template-columns: 1fr; } }
+  /* Day 146 · minmax(0,1fr), not 1fr. A bare `1fr` is `minmax(auto, 1fr)`, so the track never
+     goes narrower than its own min-content — and stacked on a phone that floor is set by the
+     widest thing in either pane (a rail scan line, a long unbroken headline). The column came
+     out ~470px inside a 390px screen, so the panes overflowed sideways and nothing inside them
+     could shrink to fit, because there was nothing to shrink to. Same guard the wide `.split`
+     already puts on its middle track. */
+  @media (max-width: 940px) { .split, .split-2 { grid-template-columns: minmax(0, 1fr); } }
   .col { border: 1px solid var(--line); border-radius: 3px; background: rgba(244,240,233,.02); }
   .col-h { font-family: "IBM Plex Mono", monospace; font-size: 10px; letter-spacing: .16em;
     text-transform: uppercase; color: var(--ink-faint); padding: 14px 16px 10px; }
@@ -238,12 +258,30 @@
   /* The Propositions rail carries two stacked lists (propositions, then floating tasks), so
      72vh cuts the lower one off before it starts. Give it the taller measure. */
   #propRail { max-height: 132vh; }
+  /* Day 146 · a stacked split is not yet a usable split.
+     Collapsing to one column puts the rail first and the detail pane under it — and the detail
+     pane is where every ACTION in these views lives: Hold / Park / thesis / Analyze on News,
+     Accept / Reject / Snooze on Theses, the whole stream card on Propositions. With the rail
+     still holding its 72vh scroll box, the News action row started ~1550px down a 390px-wide
+     screen. On a phone the tab therefore read as a list you cannot act on, and tapping a
+     headline looked like it did nothing at all.
+     The fix is two halves and needs both. HERE the rail is shortened, so the top of the detail
+     sits within reach of the fold and the panes are one scroll apart rather than two. IN THE
+     SCRIPT, choosing an item reveals the detail (revealDetail) — because a short rail alone
+     still leaves the action row below the fold on a long story, and a scroll alone leaves a
+     72vh list to climb back up through.
+     Below the two rules it overrides, not beside the grid collapse: `.rail` and `#propRail`
+     are declared after that media query, and an equal-specificity rule placed earlier loses.
+     #propRail's 132vh is for the two stacked lists it carries at reading width; on a phone
+     that measure is a page and a half of rail before the pane it feeds. */
+  @media (max-width: 940px) { .rail, #propRail { max-height: 44vh; } }
   .rail-item { padding: 13px 16px; border-top: 1px solid var(--line); cursor: pointer; }
   .rail-item:hover { background: rgba(244,240,233,.03); }
   .rail-item.sel { background: rgba(198,165,83,.08); box-shadow: inset 2px 0 0 var(--gold); }
   .rail-item .rclaim { font-size: 13.5px; line-height: 1.42; }
   .rail-item .rmeta { font-family: "IBM Plex Mono", monospace; font-size: 9.5px; letter-spacing: .12em;
-    text-transform: uppercase; color: var(--ink-faint); margin-top: 7px; display: flex; align-items: center; gap: 8px; }
+    text-transform: uppercase; color: var(--ink-faint); margin-top: 7px; display: flex; align-items: center;
+    gap: 8px; overflow: hidden; }
   .detail { padding: 26px 28px; min-height: 240px; }
   .detail .subject { font-family: "IBM Plex Mono", monospace; font-size: 10.5px; letter-spacing: .15em;
     text-transform: uppercase; color: var(--ink-faint); }
@@ -1094,6 +1132,25 @@
   function show(el, msg, ok) {
     el.textContent = msg
     el.className = "out " + (ok ? "ok" : "err")
+  }
+
+  // Day 146 · below the split breakpoint the detail pane renders under the rail, so choosing
+  // something in the rail moves nothing on screen and the action row it carries is off the
+  // bottom of the phone. Bring the pane to the top of the viewport when — and only when —
+  // the panes are stacked.
+  //
+  // 940px, not the 900px this used to be inlined at on Theses: the number has to be the width
+  // the grid actually collapses at, or between 901 and 940 the panes stack and nothing
+  // scrolls. It is stated once here and once in the media query beside `.split`.
+  //
+  // Call it from the CLICK, never from a render. Every one of these panes is also repainted
+  // programmatically — News auto-opens the top story on each load and filter change,
+  // openProposition re-runs after each mutation — and a reveal on those paths would yank the
+  // page down while the operator was reading somewhere else.
+  const STACKED = "(max-width: 940px)"
+  function revealDetail(el) {
+    if (!el || !window.matchMedia || !window.matchMedia(STACKED).matches) return
+    el.scrollIntoView({ behavior: "smooth", block: "start" })
   }
 
   // Fact/inference grammar (eye slice). The single place a mark is chosen, so a restyle
@@ -2259,7 +2316,7 @@
     if (s.asset) { const g = document.createElement("span"); g.className = "rasset"; g.textContent = "◈"; g.title = "asset: " + s.asset.title; meta.appendChild(g) }
     meta.insertAdjacentHTML("beforeend", chipHTML(s.calibration, true))
     item.appendChild(meta)
-    item.addEventListener("click", () => selectSug(s.id))
+    item.addEventListener("click", () => selectSug(s.id, true))
     return item
   }
 
@@ -2595,7 +2652,9 @@
     mount.appendChild(acts); mount.appendChild(out)
   }
 
-  function selectSug(id) {
+  // `reveal` is set by the rail click alone — loadSuggestions() also calls this to repaint the
+  // pane after a disposal, and that path must not move the page under the operator.
+  function selectSug(id, reveal) {
     SELID = id
     renderRail()
     const s = SUGS.find((x) => x.id === id)
@@ -2647,8 +2706,9 @@
     renderEvidence(s)
     // Feedback #3: on a narrow window the 3-panel grid stacks, so the detail renders
     // BELOW the rail and the click looks dead. Scroll it into view so selecting a
-    // thesis always visibly does something.
-    if (window.matchMedia && window.matchMedia("(max-width: 900px)").matches) d.scrollIntoView({ behavior: "smooth", block: "start" })
+    // thesis always visibly does something. Day 146: through the shared helper, which
+    // carries the breakpoint the grid actually collapses at.
+    if (reveal) revealDetail(d)
   }
 
   function renderEvidence(s) {
@@ -3754,7 +3814,9 @@
         + " · " + p.tasks_open + " open"
         + " · " + p.stakeholders + " stkhldr"
       row.appendChild(m)
-      row.addEventListener("click", () => openProposition(p.id))
+      // Day 146: the reveal hangs off the click, not off openProposition — that function is
+      // also the repaint after every stakeholder edit, fold and rename.
+      row.addEventListener("click", () => { openProposition(p.id); revealDetail($("propDetail")) })
       return row
     }
     for (const p of props) host.appendChild(railRow(p, false))
@@ -3789,7 +3851,7 @@
         + esc(t.status) + "</span>" + (t.horizon ? " · " + esc(t.horizon) : "")
         + (t.person_name ? " · " + esc(t.person_name) : "")
       row.appendChild(m)
-      row.addEventListener("click", () => openFloatingTask(t.id))
+      row.addEventListener("click", () => { openFloatingTask(t.id); revealDetail($("propDetail")) })
       host.appendChild(row)
     }
   }
@@ -5433,11 +5495,13 @@
         : "")
     row.appendChild(m)
     if (newsActioned(it)) row.style.opacity = ".6"
-    row.addEventListener("click", () => selectNews(it.event_id))
+    row.addEventListener("click", () => selectNews(it.event_id, true))
     return row
   }
 
-  function selectNews(eid) {
+  // `reveal` is set by the rail click alone. renderNews() also opens the top story on every
+  // load, refresh and filter change, and a reveal there would scroll the page on arrival.
+  function selectNews(eid, reveal) {
     NEWS_SEL = eid
     for (const el of $("newsRail").querySelectorAll(".rail-item")) el.classList.toggle("sel", el.dataset.eid === eid)
     const it = NEWS_CACHE.find((x) => x.event_id === eid)
@@ -5516,6 +5580,8 @@
     anBtn.onclick = () => analyzeEvent(it.event_id, slot)
     actions.append(thBtn, anBtn)
     d.appendChild(slot)
+
+    if (reveal) revealDetail(d)
   }
 
   async function disposeNews(eventId, action) {
