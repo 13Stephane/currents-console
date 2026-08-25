@@ -555,7 +555,7 @@
            This comment deliberately does NOT repeat the token: the script's first real run
            replaced it here as well as below, and its own 2-line guard caught the double
            substitution. Any second copy of that literal in this file breaks publishing. -->
-      <span class="build">build 8a3324b · 2026-08-15</span>
+      <span class="build">build local · unpublished</span>
     </span>
   </div>
 
@@ -1054,7 +1054,10 @@
           <select id="p_kind"><option value="product">product (one per Compass product)</option><option value="project">project (multi-stakeholder)</option></select>
           <label>Product</label><input id="p_product" placeholder="Currents">
           <label>Thesis statement</label><textarea id="p_thesis" rows="2" placeholder="The positioning / intent for this workspace…"></textarea>
-          <button id="p_createBtn" style="margin-top:8px">Create stream</button>
+          <!-- `mini standoff`, matching every other submit that follows a field directly
+               (addPersonBtn, addOrgBtn, addAssetBtn…). The inline margin goes with it: that is
+               what `standoff` is for. -->
+          <button id="p_createBtn" class="mini standoff">Create stream</button>
           <div class="out" id="p_createOut" style="margin-top:8px"></div>
         </div>
       </div>
@@ -2170,7 +2173,7 @@
     const ctry = mk("Country", "ISO-2, e.g. DK")
     const size = mk("Size band", "e.g. large (10,000+)  ·  free text")
     const out = document.createElement("div"); out.className = "out"; out.style.marginTop = "8px"
-    const save = mkBtn("Save org context", "btn-accept", async () => {
+    const save = mkBtn("Save org context", "btn-accept mini", async () => {
       const orgName = org.value.trim(); if (!orgName) { show(out, "Org name required", false); return }
       try {
         const r = await api("enrich_org", {
@@ -2248,7 +2251,7 @@
     modeSel.addEventListener("change", () => { heard.parentElement.style.display = modeSel.value === "record" ? "" : "none" })
 
     const out = document.createElement("div"); out.className = "out"; out.style.marginTop = "8px"
-    const save = mkBtn(cur ? "Save edit" : "Add", "btn-accept", async () => {
+    const save = mkBtn(cur ? "Save edit" : "Add", "btn-accept mini", async () => {
       const d = desc.value.trim(); if (!d) { show(out, "text required", false); return }
       const mode = modeSel.value
       if (mode === "record" && !heard.value.trim()) { show(out, "record needs 'heard from'", false); return }
@@ -2445,7 +2448,7 @@
       txt.appendChild(ta)
       if (o.why) { const w = document.createElement("div"); w.className = "hint"; w.style.marginTop = "2px"; w.textContent = o.why; txt.appendChild(w) }
       row.appendChild(txt)
-      const use = mkBtn("Use", "btn-accept", async () => {
+      const use = mkBtn("Use", "btn-accept mini", async () => {
         const val = ta.value.trim()
         if (!val) { alert("Empty — edit the wording first."); return }
         use.disabled = true; use.textContent = "…"
@@ -2494,7 +2497,7 @@
       txt.appendChild(was)
       row.appendChild(txt)
       if (h.old_value != null) {
-        const rev = mkBtn("Restore", "btn-edit", async () => {
+        const rev = mkBtn("Restore", "btn-edit mini", async () => {
           rev.disabled = true; rev.textContent = "…"
           try {
             await api("update_proposition", { proposition_id: pid, [h.field]: h.old_value })
@@ -2542,7 +2545,7 @@
       txt.appendChild(ta)
       if (o.why) { const w = document.createElement("div"); w.className = "hint"; w.style.marginTop = "2px"; w.textContent = o.why; txt.appendChild(w) }
       row.appendChild(txt)
-      const use = mkBtn("Use", "btn-accept", async () => {
+      const use = mkBtn("Use", "btn-accept mini", async () => {
         const val = ta.value.trim()
         if (!val) { alert("Empty — edit the description first."); return }
         use.disabled = true; use.textContent = "…"
@@ -2630,7 +2633,7 @@
 
     const acts = document.createElement("div"); acts.className = "acts"; acts.style.marginTop = "10px"
     const out = document.createElement("div"); out.className = "out"
-    const go = mkBtn("Accept all " + edits.length, "btn-accept", async () => {
+    const go = mkBtn("Accept all " + edits.length, "btn-accept mini", async () => {
       const successors = edits.map((e) => ({ action: e.ta.value.trim(), replaces: e.replaces }))
       if (successors.some((s) => !s.action)) { alert("A successor is empty — edit it first."); return }
       go.disabled = true; go.textContent = "…"
@@ -2648,7 +2651,7 @@
       }
     })
     acts.appendChild(go)
-    acts.appendChild(mkBtn("Discard", "btn-snooze", () => { mount.innerHTML = "" }))
+    acts.appendChild(mkBtn("Discard", "btn-snooze mini", () => { mount.innerHTML = "" }))
     mount.appendChild(acts); mount.appendChild(out)
   }
 
@@ -3678,7 +3681,11 @@
     const slot = document.createElement("div"); slot.className = "inline-edit"
     const lab = document.createElement("label"); lab.textContent = "Current action"; slot.appendChild(lab)
     const ta = document.createElement("textarea"); ta.value = t.current_action || ""; slot.appendChild(ta)
-    slot.appendChild(mkBtn("Save action", "btn-edit", async () => {
+    // `standoff` and not bare `mini`: this button follows a textarea directly, and `.mini`
+    // zeroes the margin (it was written for buttons in a gapped `.acts` row). A submit flush
+    // against its last input reads as part of the input rather than as an act — the exact case
+    // the CSS comment at `button.mini.standoff` describes.
+    slot.appendChild(mkBtn("Save action", "btn-edit mini standoff", async () => {
       const v = ta.value.trim(); if (!v || v === t.current_action) { slot.remove(); return }
       try { await api("update_task", { task_id: t.id, current_action: v }); refreshAfterTaskChange() }
       catch (e) { show(card._out, e.message, false) }
@@ -4214,7 +4221,18 @@
     // Day 145 · the operator can override that order by dragging. `stream_rank` is NULL until
     // they do, so an untouched stream sorts exactly as it did before — see the migration header
     // for why this is not a rerun of the horizon board.
-    const isRanked = p.tasks.some((x) => x.stream_rank != null)
+    //
+    // Day 146 · TWO mechanisms write stream_rank now, and reading them as one would make this
+    // heading lie. A drag calls set_task_stream_order, which restates the whole visible list
+    // from `unnest(...) with ordinality` — ordinality starts at 1, so a drag only ever writes
+    // ranks >= 1. Arrival placement (the trigger in 20260816090000) writes 0 and downward. The
+    // two halves are disjoint by construction, which is the whole reason the sign convention
+    // was chosen, so the question "did the operator order this?" stays answerable from the data
+    // alone with no extra flag to keep in sync.
+    const isHandOrdered = p.tasks.some((x) => x.stream_rank != null && x.stream_rank >= 1)
+    const hasArrivals   = p.tasks.some((x) => x.stream_rank != null && x.stream_rank <= 0)
+    // Everything downstream that asks "is this list off the review clock?" still wants either.
+    const isRanked = isHandOrdered || hasArrivals
     // The heading states which order you are looking at. A list whose sort has been silently
     // replaced is the failure mode here: the review clock is still on every card, so without
     // this the operator could read a hand-ordered list as a due-date one.
@@ -4274,11 +4292,21 @@
         openProposition(p.id)
       })
       reset.style.marginTop = "0"
-      reset.title = "Clear the manual order for this stream and go back to sorting by review date"
+      // clear_task_stream_order clears every non-null rank in the family, so it drops BOTH the
+      // hand order and the new-first placement. The tooltip has to say so, or the operator
+      // clicks it to undo a drag and silently loses the arrival ordering too.
+      reset.title = isHandOrdered
+        ? "Clear this stream's order — both your hand order and the new-first placement — and go back to sorting by review date"
+        : "Stop putting newly arrived tasks first and sort the whole stream by review date"
       orderCtl.push(reset)
     }
-    host.appendChild(propSection(
-      "Tasks · " + (isRanked ? "your order" : "by review date"), orderCtl, 3))
+    // Three states, because there are three orders. Saying "your order" over a list the
+    // operator never touched is the failure this replaces: it would credit them with an
+    // arrangement the system made, on a pane whose whole point is that the operator disposes.
+    const orderLabel = isHandOrdered ? "your order"
+      : hasArrivals ? "newest first, then by review date"
+      : "by review date"
+    host.appendChild(propSection("Tasks · " + orderLabel, orderCtl, 3))
     // The form opens directly under the rule that carries its button, above the list it adds to.
     host.appendChild(addTaskSlot)
     // Terminal tasks are hidden from the lanes by default (Day 140, from first-use feedback:
@@ -4326,8 +4354,13 @@
     host.appendChild(hz)
     if (liveTasks.length > 1) {
       const g = document.createElement("p"); g.className = "hint"; g.style.marginTop = "8px"
+      // Keyed on isHandOrdered, not isRanked: a stream that only has arrivals on top has NOT
+      // been ordered by hand, so the "until you do" clause is still the true reading of it.
       g.innerHTML = '<span style="color:var(--ink-faint)">⠿</span> drag a task by its grip to set '
-        + "the order you intend to work in" + (isRanked ? "" : " — the list is on the review clock until you do")
+        + "the order you intend to work in"
+        + (isHandOrdered ? ""
+           : hasArrivals ? " — until you do, newly arrived tasks lead and the rest is on the review clock"
+           : " — the list is on the review clock until you do")
       host.appendChild(g)
     }
     if (doneTasks.length) {
@@ -4335,8 +4368,10 @@
       for (const t of doneTasks) byStatus[t.status] = (byStatus[t.status] || 0) + 1
       const summary = Object.entries(byStatus).map(([s, n]) => n + " " + s).join(" · ")
       const tog = mkBtn((PROP_SHOW_DONE ? "hide" : "show") + " " + doneTasks.length + " retired · " + summary,
-        "btn-snooze", () => { PROP_SHOW_DONE = !PROP_SHOW_DONE; renderPropDetail(p) })
-      tog.style.cssText = "margin-top:8px;padding:4px 10px;font-size:11px"
+        "btn-snooze mini", () => { PROP_SHOW_DONE = !PROP_SHOW_DONE; renderPropDetail(p) })
+      // padding + font-size came off the element: that pair WAS `.mini`, written out by hand.
+      // Only the top margin is this button's own, so only it stays inline.
+      tog.style.marginTop = "8px"
       host.appendChild(tog)
     }
 
@@ -4399,8 +4434,10 @@
     }
     row.appendChild(tags)
 
-    const cb = mkBtn("✉ compose", "btn-edit", () => openCompose(s.person_id, s.name, p.id))
-    cb.style.cssText = "font-size:11px;padding:4px 8px;margin:0"; row.appendChild(cb)
+    // Was hand-inlined to `font-size:11px;padding:4px 8px;margin:0` — which is `.mini` spelled
+    // out on the element. The class says it once, in the place that owns the scale.
+    const cb = mkBtn("✉ compose", "btn-edit mini", () => openCompose(s.person_id, s.name, p.id))
+    row.appendChild(cb)
     return row
   }
 
@@ -4490,7 +4527,7 @@
           const r = await api("search_people", { q }); res.innerHTML = ""
           for (const person of (r.people || [])) {
             const name = person.full_name + (person.org ? " · " + person.org : "")
-            const b = mkBtn("+ " + name, "btn-edit", () => addStake(p.id, person.id)); b.style.textAlign = "left"; res.appendChild(b)
+            const b = mkBtn("+ " + name, "btn-edit mini", () => addStake(p.id, person.id)); b.style.textAlign = "left"; res.appendChild(b)
           }
           if (!(r.people || []).length) res.innerHTML = '<p class="hint">No match.</p>'
         } catch (e) { res.innerHTML = '<p class="hint">' + e.message + "</p>" }
@@ -4515,7 +4552,7 @@
     const lab = document.createElement("label"); lab.textContent = "Fold a pending thesis into this stream (its org attaches too)"; wrap.appendChild(lab)
     if (!sugs.length) { const e = document.createElement("p"); e.className = "hint"; e.textContent = "No pending theses right now."; wrap.appendChild(e) }
     for (const s of sugs.slice(0, 25)) {
-      const b = mkBtn("⤵ " + (s.suggested_action || "(thesis)").slice(0, 100), "btn-edit", () => foldOne(p.id, s.id))
+      const b = mkBtn("⤵ " + (s.suggested_action || "(thesis)").slice(0, 100), "btn-edit mini", () => foldOne(p.id, s.id))
       b.style.cssText = "text-align:left;display:block;width:100%"; wrap.appendChild(b)
     }
     mount.appendChild(wrap); wrap.scrollIntoView({ block: "nearest" })
@@ -4567,8 +4604,8 @@
     bd.value = p.name ? (p.name.split(" ")[0] + " —\n\n") : ""
     left.appendChild(bd)
     const acts = document.createElement("div"); acts.className = "acts"; acts.style.marginTop = "8px"
-    acts.appendChild(mkBtn("Copy & mark sent", "btn-accept", () => sendCompose(true)))
-    acts.appendChild(mkBtn("Mark sent", "btn-edit", () => sendCompose(false)))
+    acts.appendChild(mkBtn("Copy & mark sent", "btn-accept mini", () => sendCompose(true)))
+    acts.appendChild(mkBtn("Mark sent", "btn-edit mini", () => sendCompose(false)))
     left.appendChild(acts)
     const out = document.createElement("div"); out.className = "out"; out.id = "compose_out"; out.style.marginTop = "8px"; left.appendChild(out)
     const note = document.createElement("div"); note.className = "hint"; note.style.marginTop = "6px"
@@ -4742,8 +4779,8 @@
 
     // ── draft in / draft out ────────────────────────────────────────────────
     const dacts = document.createElement("div"); dacts.className = "acts"
-    dacts.appendChild(mkBtn("⧉ Copy merge brief", "btn-edit", copyMergeBrief))
-    dacts.appendChild(mkBtn("⬇ Paste draft", "btn-edit", toggleMergePaste))
+    dacts.appendChild(mkBtn("⧉ Copy merge brief", "btn-edit mini", copyMergeBrief))
+    dacts.appendChild(mkBtn("⬇ Paste draft", "btn-edit mini", toggleMergePaste))
     host.appendChild(dacts)
     const dhint = document.createElement("p"); dhint.className = "hint"; dhint.style.marginTop = "6px"
     dhint.textContent = "Declare the roles first: the brief tells the model which parents are dropped, and only those need a rationale. Take the brief to any model, paste the JSON back. Drafted text shows italic gold and clears the moment you edit it."
@@ -4791,7 +4828,7 @@
     const chost = document.createElement("div"); chost.className = "mg-conseq"; chost.id = "mg_conseq"; host.appendChild(chost)
 
     const acts = document.createElement("div"); acts.className = "acts"
-    acts.appendChild(mkBtn("Commit merge", "btn-accept", commitMerge))
+    acts.appendChild(mkBtn("Commit merge", "btn-accept mini", commitMerge))
     host.appendChild(acts)
     const out = document.createElement("div"); out.className = "out"; out.id = "mg_out"; host.appendChild(out)
 
@@ -4824,8 +4861,8 @@
           p.role = null; p.rationale = ""; p.suggested = false; paintMergeParents(); paintMergeConsequences()
         }))
       } else {
-        acts.appendChild(mkBtn("Carried", "btn-accept", () => { p.role = "carried"; paintMergeParents(); paintMergeConsequences() }))
-        acts.appendChild(mkBtn("Dropped", "btn-edit", () => { p.role = "dropped"; paintMergeParents(); paintMergeConsequences() }))
+        acts.appendChild(mkBtn("Carried", "btn-accept mini", () => { p.role = "carried"; paintMergeParents(); paintMergeConsequences() }))
+        acts.appendChild(mkBtn("Dropped", "btn-edit mini", () => { p.role = "dropped"; paintMergeParents(); paintMergeConsequences() }))
         const u = document.createElement("span"); u.className = "hint"; u.style.alignSelf = "center"
         u.textContent = "undeclared"
         acts.appendChild(u)
@@ -4977,7 +5014,7 @@
     ta.placeholder = '{ "title": "...", "thesis_statement": "...", "falsifier": {...}, "parents": [{"id": "...", "rationale": "..."}] }'
     slot.appendChild(ta)
     const acts = document.createElement("div"); acts.className = "acts"
-    acts.appendChild(mkBtn("Apply draft", "btn-accept", applyMergeDraft))
+    acts.appendChild(mkBtn("Apply draft", "btn-accept mini", applyMergeDraft))
     slot.appendChild(acts)
   }
 
